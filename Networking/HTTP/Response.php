@@ -15,12 +15,17 @@
 
 namespace Bread\Networking\HTTP;
 
+use Bread\Networking;
+use Bread\Stream;
 use DateTime;
 
-class Response extends Message {
+class Response extends Message implements Stream\Interfaces\Writable {
   public $statusLine;
   public $status;
   public $reason;
+  private $chunkedEncoding = false;
+  private $writable;
+  private $closed;
 
   protected static $statusCodes = array(
     100 => "Continue",
@@ -85,11 +90,48 @@ class Response extends Message {
     $this->request = $request;
     $this->status = $status;
     $this->reason = self::$statusCodes[$this->status];
-    $this->statusLine = implode(' ',
-      array(
-        $protocol, $status, $this->reason
-      ));
-    parent::__construct($request->connection, $protocol, $this->statusLine,
-      $headers, $body);
+    $this->statusLine = implode(' ', array(
+      $protocol, $status, $this->reason
+    ));
+    parent::__construct($request->connection, $protocol, $this->statusLine, $headers, $body);
+  }
+
+  public function isWritable() {
+    return $this->writable;
+  }
+
+  public function write($data) {
+    if ($this->chunkedEncoding) {
+      $len = strlen($data);
+      $chunk = dechex($len) . "\r\n" . $data . "\r\n";
+      $flushed = $this->connection->write($chunk);
+    }
+    else {
+      $flushed = $this->connection->write($data);
+    }
+    return $flushed;
+  }
+
+  public function end($data = null) {
+    if (null !== $data) {
+      $this->write($data);
+    }
+    if ($this->chunkedEncoding) {
+      $this->connection->write("0\r\n\r\n");
+    }
+    $this->emit('end');
+    $this->removeAllListeners();
+    $this->connection->end();
+  }
+
+  public function close() {
+    if ($this->closed) {
+      return;
+    }
+    $this->closed = true;
+    $this->writable = false;
+    $this->emit('close');
+    $this->removeAllListeners();
+    $this->connection->close();
   }
 }

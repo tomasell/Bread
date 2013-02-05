@@ -15,21 +15,26 @@
 
 namespace Bread\Networking\HTTP;
 
-class Request extends Message {
+use Bread\Networking;
+use Bread\Stream;
+
+class Request extends Message implements Stream\Interfaces\Readable {
+  use Stream\Traits\Pipe;
+
   public $requestLine;
   public $method;
   public $uri;
+  private $readable = true;
 
-  public function __construct($connection, $method = 'GET', $uri = '/',
-    $protocol = 'HTTP/1.1', $headers = array(), $body = null) {
-    $this->requestLine = implode(' ',
-      array(
-        $method, $uri, $protocol
-      ));
+  public function __construct(Networking\Interfaces\Connection $connection,
+    $method = 'GET', $uri = '/', $protocol = 'HTTP/1.1', $headers = array(),
+    $body = null) {
+    $this->requestLine = implode(' ', array(
+      $method, $uri, $protocol
+    ));
     $this->method = $method;
     $this->uri = $uri;
-    parent::__construct($connection, $protocol, $this->requestLine, $headers,
-      $body);
+    parent::__construct($connection, $protocol, $this->requestLine, $headers, $body);
   }
 
   public function __get($name) {
@@ -39,5 +44,23 @@ class Request extends Message {
     default:
       return parent::__get($name);
     }
+  }
+
+  public function isReadable() {
+    return $this->readable;
+  }
+
+  public function pause() {
+    $this->emit('pause');
+  }
+
+  public function resume() {
+    $this->emit('resume');
+  }
+
+  public function close() {
+    $this->readable = false;
+    $this->emit('end');
+    $this->removeAllListeners();
   }
 }

@@ -15,6 +15,7 @@
 
 namespace Bread\Event\Loop;
 
+use Bread\Event;
 use SplPriorityQueue;
 use InvalidArgumentException;
 
@@ -26,7 +27,7 @@ class Timers {
   private $active;
   private $timers;
 
-  public function __construct(LoopInterface $loop) {
+  public function __construct(Event\Interfaces\Loop $loop) {
     $this->loop = $loop;
     $this->active = array();
     $this->timers = new SplPriorityQueue();

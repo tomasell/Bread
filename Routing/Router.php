@@ -33,14 +33,10 @@ class Router {
         if (!is_subclass_of($matches['controller'], 'Bread\Controller')) {
           throw new Exceptions\NotFound($matches['controller']);
         }
-        $controller = new $matches['controller']($request);
-        $callback = array(
-          $controller, $matches['action']
-        );
         $arguments = array_intersect_key($matches,
           array_flip((array) $route->arguments));
         return array(
-          $callback, $arguments
+          $matches['controller'], $matches['action'], $arguments
         );
       }
     }

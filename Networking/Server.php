@@ -16,74 +16,55 @@
 namespace Bread\Networking;
 
 use Bread\Event;
-use Bread\Networking\HTTP\Exception;
+use RuntimeException;
 
-class Server extends Event\Listener {
-  const DEFAULT_TIMEOUT = 10;
-  const MAX_CLIENTS = 25;
-  const MAX_LINE_LENGTH = 8190;
+class Server extends Event\Emitter implements Interfaces\Server {
+  public $master;
+  private $loop;
 
-  protected $socket;
-  protected $clients;
-
-  public function __construct($address = 'localhost', $port = 8000) {
-    if (false
-      === ($this->socket = stream_socket_server("$address:$port", $errno,
-        $errstr))) {
-      throw new Exception("$errstr ($errno)");
-    }
-    $this->clients = array();
+  public function __construct(Event\Interfaces\Loop $loop) {
+    $this->loop = $loop;
   }
 
-  public function __destruct() {
-    $this->close();
+  public function listen($port, $host = '127.0.0.1') {
+    $this->master = stream_socket_server("tcp://$host:$port", $errno, $errstr);
+    if (false === $this->master) {
+      $message = "Could not bind to tcp://$host:$port: $errstr";
+      throw new Exceptions\Connection($message, $errno);
+    }
+    stream_set_blocking($this->master, 0);
+    $this->loop->addReadStream($this->master, function ($master) {
+      $newSocket = stream_socket_accept($master);
+      if (false === $newSocket) {
+        $this->emit('error', array(
+          new RuntimeException('Error accepting new connection')
+        ));
+        return;
+      }
+      $this->handleConnection($newSocket);
+    });
   }
 
-  public function accept() {
-    stream_set_blocking($this->socket, 0);
-    while (true) {
-      $read = array(
-        $this->socket
-      );
-      foreach ($this->clients as $client) {
-        $read[] = $client->input;
-      }
-      if (!stream_select($read, $write = null, $except = null, 0)) {
-        continue;
-      }
-      if (false !== ($key = array_search($this->socket, $read))) {
-        if (false
-          !== ($connection = stream_socket_accept($this->socket,
-            self::DEFAULT_TIMEOUT, $peer))) {
-          list($address, $port) = explode(':', $peer);
-          $this->clients[] = new Connection($address, $port, $connection,
-            $connection);
-        }
-      }
-      foreach ($this->clients as $i => $client) {
-        if (false !== ($key = array_search($client->input, $read))) {
-          if (false !== ($data = $client->read(self::MAX_LINE_LENGTH))) {
-            $this->trigger('data', $client, $data);
-          }
-          else {
-            print("Disconnected\n");
-            unset($this->clients[$i]);
-          }
-        }
-      }
-    }
+  public function handleConnection($socket) {
+    stream_set_blocking($socket, 0);
+    $client = $this->createConnection($socket);
+    $this->emit('connection', array(
+      $client
+    ));
   }
 
-  public function send($connection, $stream) {
-    while ($data = fgets($stream)) {
-      $connection->write($data);
-    }
+  public function getPort() {
+    $name = stream_socket_get_name($this->master, false);
+    return (int) substr(strrchr($name, ':'), 1);
   }
 
-  protected function close() {
-    foreach ($this->clients as $client) {
-      $client->close();
-    }
-    fclose($this->socket);
+  public function shutdown() {
+    $this->loop->removeStream($this->master);
+    fclose($this->master);
+  }
+
+  public function createConnection($socket) {
+    return new Connection($socket, $this->loop);
   }
 }
+

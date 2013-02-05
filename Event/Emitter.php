@@ -23,6 +23,7 @@ abstract class Emitter implements Interfaces\Emitter {
       $this->listeners[$event] = [];
     }
     $this->listeners[$event][] = $listener;
+    return $this;
   }
 
   public function once($event, callable $listener) {
@@ -30,7 +31,7 @@ abstract class Emitter implements Interfaces\Emitter {
       $this->removeListener($event, $onceListener);
       call_user_func_array($listener, func_get_args());
     };
-    $this->on($event, $onceListener);
+    return $this->on($event, $onceListener);
   }
 
   public function removeListener($event, callable $listener) {
@@ -57,5 +58,6 @@ abstract class Emitter implements Interfaces\Emitter {
     foreach ($this->listeners($event) as $listener) {
       call_user_func_array($listener, $arguments);
     }
+    return $this;
   }
 }

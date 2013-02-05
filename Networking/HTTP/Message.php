@@ -15,9 +15,10 @@
 
 namespace Bread\Networking\HTTP;
 
+use Bread\Networking;
 use Bread\Event;
 
-abstract class Message extends Event\Listener {
+abstract class Message extends Event\Emitter {
   public $connection;
   public $startLine;
   public $protocol;
@@ -255,9 +256,8 @@ abstract class Message extends Event\Listener {
     'vtt' => 'text/vtt',
   );
 
-  public function __construct($connection, $protocol = 'HTTP/1.1',
+  public function __construct(Networking\Interfaces\Connection $connection, $protocol = 'HTTP/1.1',
     $startLine = '', $headers = array(), $body = null) {
-    parent::__construct();
     $this->connection = $connection;
     $this->protocol = $protocol;
     $this->startLine = $startLine;

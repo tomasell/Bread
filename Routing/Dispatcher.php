@@ -21,20 +21,15 @@ use Bread\Networking\HTTP\Exception;
 use Bread\Networking\HTTP\Message\Header;
 
 class Dispatcher {
-  public function dispatch(Request $request) {
+  public function dispatch(Request $request, Response $response) {
     $router = new Router();
     try {
-      list($callback, $arguments) = $router->route($request);
-      $response = call_user_func_array($callback, $arguments);
+      list($Controller, $action, $arguments) = $router->route($request);
+      // TODO check if $Controller is_subclass_of and $action is_callable
+      $controller = new $Controller($request, $response);
+      $callback = array($controller, $action);
+      call_user_func_array($callback, $arguments);
     } catch (Exception $exception) {
-      $response = new Response($request, $exception->getCode(),
-        $exception->getMessage(),
-        array(
-          new Header('Content-Type', 'text/plain', array(
-            'charset' => 'utf-8'
-          )),
-          new Header('Content-Length', strlen($exception->getMessage()))
-        ));
     }
     return $response;
   }

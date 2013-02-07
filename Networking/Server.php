@@ -66,5 +66,9 @@ class Server extends Event\Emitter implements Interfaces\Server {
   public function createConnection($socket) {
     return new Connection($socket, $this->loop);
   }
+
+  public function run() {
+    return $this->loop->run();
+  }
 }
 

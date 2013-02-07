@@ -56,7 +56,9 @@ abstract class Emitter implements Interfaces\Emitter {
 
   public function emit($event, array $arguments = []) {
     foreach ($this->listeners($event) as $listener) {
-      call_user_func_array($listener, $arguments);
+      if (false === call_user_func_array($listener, $arguments)) {
+        break;
+      }
     }
     return $this;
   }

@@ -51,6 +51,7 @@ class Parser extends Event\Emitter {
   public function reset() {
     $this->request = null;
     $this->expecting = static::EXPECTING_REQUEST_LINE;
+    return $this;
   }
 
   public function parse($data, $connection) {
@@ -71,7 +72,14 @@ class Parser extends Event\Emitter {
               $matches['uri'], $matches['version']);
             print("New request from " . $connection->getRemoteAddress() . "\n");
             print("{$this->request->requestLine}\n");
-            $this->request->on('end', function () {
+            $this->request->on('data', function ($data) {
+              $this->request->receivedLength += strlen($data);
+              printf("Received %d of %d\n", $this->request->receivedLength, $this->request->contentLength);
+              if ($this->request->receivedLength
+                >= $this->request->contentLength) {
+                //$this->request->close();
+              }
+            })->on('end', function () {
               $this->expecting = static::EXPECTING_REQUEST_LINE;
             })->on('close', function () {
               $this->removeAllListeners();
@@ -122,7 +130,9 @@ class Parser extends Event\Emitter {
         }
       }
       if (!is_null($data)) {
-        $this->emit('headers', array($this->request, $data));
+        $this->emit('headers', array(
+          $this->request, $data
+        ));
       }
     } catch (Exception $exception) {
     print("Exception: {$exception->getMessage()}\n");

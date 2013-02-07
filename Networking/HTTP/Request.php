@@ -21,6 +21,7 @@ use Bread\Stream;
 class Request extends Message implements Stream\Interfaces\Readable {
   use Stream\Traits\Pipe;
 
+  public $receivedLength = 0;
   public $requestLine;
   public $method;
   public $uri;
@@ -41,6 +42,9 @@ class Request extends Message implements Stream\Interfaces\Readable {
     switch ($name) {
     case 'host':
       return isset($this->headers['Host']) ? $this->headers['Host'] : null;
+    case 'contentLength':
+      return isset($this->headers['Content-Length']) ? $this->headers['Content-Length']
+        : 0;
     default:
       return parent::__get($name);
     }

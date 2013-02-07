@@ -105,6 +105,9 @@ class Response extends Message implements Stream\Interfaces\Writable {
   }
 
   public function write($data) {
+    $this->emit('headers', array(
+      $this
+    ));
     if ($this->chunkedEncoding) {
       $len = strlen($data);
       $chunk = dechex($len) . "\r\n" . $data . "\r\n";

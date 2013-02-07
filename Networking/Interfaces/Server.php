@@ -21,4 +21,5 @@ interface Server extends Event\Interfaces\Emitter {
   public function listen($port, $host = '127.0.0.1');
   public function getPort();
   public function shutdown();
+  public function run();
 }

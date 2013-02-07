@@ -24,8 +24,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
   public function __construct(Event\Interfaces\Loop $loop) {
     $this->io = new Networking\Server($loop);
     $this->io->on('connection', function ($conn) {
-      // TODO: http 1.1 keep-alive
-      // TODO: chunked transfer encoding (also for outgoing data)
+      // TODO: chunked transfer encoding
       // TODO: multipart parsing
       $parser = new Parser();
       $parser->on('headers', function (Request $request, $data) use ($conn,
@@ -58,7 +57,9 @@ class Server extends Event\Emitter implements Interfaces\Server {
   public function handleRequest(Networking\Interfaces\Connection $conn,
     Parser $parser, Request $request, $data) {
     $response = new Response($request);
-    $response->on('close', array(
+    $response->once('headers', function ($response) {
+      $response->write((string) $response);
+    })->on('close', array(
       $request, 'close'
     ));
     if (!$this->listeners('request')) {
@@ -70,10 +71,9 @@ class Server extends Event\Emitter implements Interfaces\Server {
       $parser->removeAllListeners();
     }
     else {
-      $response->on('close', function () use ($conn, $parser) {
-        $parser->reset();
+      $request->on('end', function () use ($conn, $parser) {
         $conn->on('data', array(
-          $parser, 'parse'
+          $parser->reset(), 'parse'
         ));
       });
     }
@@ -81,13 +81,13 @@ class Server extends Event\Emitter implements Interfaces\Server {
       $request, $response
     ));
     if ((isset($request->headers['Content-Length'])
-      || isset($request->headers['Transfer-Encoding'])) && !is_null($data)) {
-      $request->emit('data', array(
+      || isset($request->headers['Transfer-Encoding']))) {
+      is_null($data) || $request->emit('data', array(
         $data
       ));
     }
     else {
-      $request->emit('end');
+      $request->close();
     }
   }
 
@@ -97,6 +97,10 @@ class Server extends Event\Emitter implements Interfaces\Server {
 
   public function getPort() {
     return $this->io->getPort();
+  }
+
+  public function run() {
+    return $this->io->run();
   }
 
   public function shutdown() {

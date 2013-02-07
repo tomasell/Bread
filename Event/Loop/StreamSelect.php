@@ -20,12 +20,12 @@ use Bread\Event;
 class StreamSelect implements Event\Interfaces\Loop {
   const QUANTUM_INTERVAL = 1000000;
 
-  private $timers;
-  private $running = false;
-  private $readStreams = array();
-  private $readListeners = array();
-  private $writeStreams = array();
-  private $writeListeners = array();
+  protected $timers;
+  protected $running = false;
+  protected $readStreams = array();
+  protected $readListeners = array();
+  protected $writeStreams = array();
+  protected $writeListeners = array();
 
   public function __construct() {
     $this->timers = new Timers($this);

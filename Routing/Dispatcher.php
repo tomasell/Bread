@@ -18,19 +18,28 @@ namespace Bread\Routing;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
 use Bread\Networking\HTTP\Exception;
-use Bread\Networking\HTTP\Message\Header;
+use Bread\Networking\HTTP\Client\Exceptions;
+use Bread\Promise;
 
 class Dispatcher {
   public function dispatch(Request $request, Response $response) {
     $router = new Router();
-    try {
-      list($Controller, $action, $arguments) = $router->route($request);
-      // TODO check if $Controller is_subclass_of and $action is_callable
+    $router->route($request)->then(function ($result) use ($request, $response) {
+      list($Controller, $action, $arguments) = $result;
+      if (!is_subclass_of($Controller, 'Bread\Controller')) {
+        return Promise\When::reject(new Exceptions\NotFound($request->uris));
+      }
       $controller = new $Controller($request, $response);
-      $callback = array($controller, $action);
-      call_user_func_array($callback, $arguments);
-    } catch (Exception $exception) {
-    }
-    return $response;
+      $callback = array(
+        $controller, $action
+      );
+      if (!is_callable($callback)) {
+        return Promise\When::reject(new Exceptions\NotFound($request->uri));
+      }
+      return call_user_func_array($callback, $arguments);
+    })->then(null, function (Exception $exception) use ($response) {
+      $response->status($exception->getCode());
+      $response->end($exception->getMessage());
+    });
   }
 }

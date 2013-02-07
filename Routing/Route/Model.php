@@ -18,7 +18,7 @@ namespace Bread\Routing\Route;
 use Bread;
 
 class Model extends Bread\Model {
-  protected $match;
+  protected $pattern;
   protected $defaults;
   protected $arguments;
 }

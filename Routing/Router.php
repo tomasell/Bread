@@ -17,6 +17,7 @@ namespace Bread\Routing;
 
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Client\Exceptions;
+use Bread\Promise;
 
 class Router {
   public static $routes = array();
@@ -25,21 +26,20 @@ class Router {
     $routes = static::$routes;
     foreach ($routes as $route) {
       $route = new Route\Model($route);
-      if (preg_match($route->match, $request->uri, $matches)) {
-        $matches = array_merge(
-          array(
-            'controller' => null, 'action' => null
-          ), $route->defaults, $matches);
+      if (preg_match($route->pattern, $request->uri, $matches)) {
+        $matches = array_merge(array(
+          'controller' => null, 'action' => null
+        ), $route->defaults, $matches);
         if (!is_subclass_of($matches['controller'], 'Bread\Controller')) {
-          throw new Exceptions\NotFound($matches['controller']);
+          return Promise\When::reject(new Exceptions\NotFound(
+            $matches['controller']));
         }
-        $arguments = array_intersect_key($matches,
-          array_flip((array) $route->arguments));
-        return array(
+        $arguments = array_intersect_key($matches, array_flip((array) $route->arguments));
+        return Promise\When::resolve(array(
           $matches['controller'], $matches['action'], $arguments
-        );
+        ));
       }
     }
-    throw new Exceptions\NotFound($request->uri);
+    return Promise\When::reject(new Exceptions\NotFound($request->uri));
   }
 }

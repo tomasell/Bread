@@ -99,8 +99,8 @@ class Response extends Message implements Stream\Interfaces\Writable {
   public function status($status, $protocol = 'HTTP/1.1') {
     $this->status = $status;
     $this->reason = self::$statusCodes[$this->status];
-    $this->statusLine = implode(' ', array(
-      $protocol, $status, $this->reason
+    $this->startLine = $this->statusLine = implode(' ', array(
+      $protocol, $this->status, $this->reason
     ));
   }
 

@@ -37,7 +37,7 @@ class Headers implements ArrayAccess, Countable, IteratorAggregate {
   }
 
   public function offsetGet($offset) {
-    return $this->headers[$offset];
+    return isset($this->headers[$offset]) ? $this->headers[$offset] : null;
   }
 
   public function offsetSet($offset, $value) {

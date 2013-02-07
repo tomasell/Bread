@@ -24,8 +24,8 @@ class Response extends Message implements Stream\Interfaces\Writable {
   public $status;
   public $reason;
   private $chunkedEncoding = false;
-  private $writable;
-  private $closed;
+  private $writable = true;
+  private $closed = false;
 
   protected static $statusCodes = array(
     100 => "Continue",
@@ -123,9 +123,11 @@ class Response extends Message implements Stream\Interfaces\Writable {
     if ($this->chunkedEncoding) {
       $this->connection->write("0\r\n\r\n");
     }
-    $this->emit('end');
+    $this->emit('close');
     $this->removeAllListeners();
-    $this->connection->end();
+    if ('close' === $this->request->headers['Connection']) {
+      $this->connection->end();
+    }
   }
 
   public function close() {

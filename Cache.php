@@ -13,10 +13,13 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache;
+namespace Bread;
 
-class Factory {
-  public static function create() {
-    return new Engines\Internal();
+class Cache {
+  public static function factory() {
+    if (class_exists('APCIterator')) {
+      return new Cache\APC();
+    }
+    return new Cache\Internal();
   }
 }

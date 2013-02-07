@@ -25,8 +25,4 @@ use Bread\Networking\HTTP\Exception;
 class BadRequest extends Exception {
   protected $code = 400;
   protected $message = "Bad Request";
-
-  public function __construct($body = null) {
-    $this->body = $body;
-  }
 }

@@ -20,8 +20,10 @@ use Bread\Networking\HTTP\Response;
 
 abstract class Controller {
   protected $request;
+  protected $response;
 
-  public function __construct(Request $request) {
+  public function __construct(Request $request, Response $response) {
     $this->request = $request;
+    $this->response = $response;
   }
 }

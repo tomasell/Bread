@@ -18,4 +18,5 @@ namespace Bread\Networking\HTTP\Interfaces;
 use Bread\Networking;
 
 interface Server extends Networking\Interfaces\Server {
+
 }

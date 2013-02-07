@@ -35,4 +35,8 @@ class Internal implements Bread\Interfaces\Cache {
   public function remove($key) {
     unset($this->data[$key]);
   }
+
+  public function clear() {
+    $this->data = array();
+  }
 }

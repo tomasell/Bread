@@ -88,16 +88,20 @@ class Response extends Message implements Stream\Interfaces\Writable {
   public function __construct(Request $request, $status = 200, $body = null,
     $headers = array(), $protocol = 'HTTP/1.1') {
     $this->request = $request;
-    $this->status = $status;
-    $this->reason = self::$statusCodes[$this->status];
-    $this->statusLine = implode(' ', array(
-      $protocol, $status, $this->reason
-    ));
+    $this->status($status, $protocol);
     parent::__construct($request->connection, $protocol, $this->statusLine, $headers, $body);
   }
 
   public function isWritable() {
     return $this->writable;
+  }
+
+  public function status($status, $protocol = 'HTTP/1.1') {
+    $this->status = $status;
+    $this->reason = self::$statusCodes[$this->status];
+    $this->statusLine = implode(' ', array(
+      $protocol, $status, $this->reason
+    ));
   }
 
   public function write($data) {

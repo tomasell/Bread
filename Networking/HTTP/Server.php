@@ -28,8 +28,9 @@ class Server extends Event\Emitter implements Interfaces\Server {
       // TODO: chunked transfer encoding (also for outgoing data)
       // TODO: multipart parsing
       $parser = new Parser();
-      $parser->on('headers', function (Request $request) use ($conn, $parser) {
-        $this->handleRequest($conn, $request);
+      $parser->on('headers', function (Request $request, $data) use ($conn,
+        $parser) {
+        $this->handleRequest($conn, $parser, $request, $data);
         $conn->removeListener('data', array(
           $parser, 'parse'
         ));
@@ -47,6 +48,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
         $request->on('resume', function () use ($conn) {
           $conn->emit('resume');
         });
+        $parser->removeAllListeners();
       });
       $conn->on('data', array(
         $parser, 'parse'
@@ -55,7 +57,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
   }
 
   public function handleRequest(Networking\Interfaces\Connection $conn,
-    Request $request) {
+    Parser $parser, Request $request, $data) {
     $response = new Response($request);
     $response->on('close', array(
       $request, 'close'
@@ -64,9 +66,30 @@ class Server extends Event\Emitter implements Interfaces\Server {
       $response->end();
       return;
     }
+    if (isset($request->headers['Connection'])
+      && 'close' === $request->headers['Connection']) {
+      $parser->removeAllListeners();
+    }
+    else {
+      $response->on('close', function () use ($conn, $parser) {
+        $parser->reset();
+        $conn->on('data', array(
+          $parser, 'parse'
+        ));
+      });
+    }
     $this->emit('request', array(
       $request, $response
     ));
+    if ((isset($request->headers['Content-Length'])
+      || isset($request->headers['Transfer-Encoding'])) && !is_null($data)) {
+      $request->emit('data', array(
+        $data
+      ));
+    }
+    else {
+      $request->emit('end');
+    }
   }
 
   public function listen($port = 80, $host = '127.0.0.1') {

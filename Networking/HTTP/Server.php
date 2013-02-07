@@ -48,7 +48,6 @@ class Server extends Event\Emitter implements Interfaces\Server {
         $request->on('resume', function () use ($conn) {
           $conn->emit('resume');
         });
-        $parser->removeAllListeners();
       });
       $conn->on('data', array(
         $parser, 'parse'

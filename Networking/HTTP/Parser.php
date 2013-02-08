@@ -72,14 +72,7 @@ class Parser extends Event\Emitter {
               $matches['uri'], $matches['version']);
             print("New request from " . $connection->getRemoteAddress() . "\n");
             print("{$this->request->requestLine}\n");
-            $this->request->on('data', function ($data) {
-              $this->request->receivedLength += strlen($data);
-              printf("Received %d of %d\n", $this->request->receivedLength, $this->request->contentLength);
-              if ($this->request->receivedLength
-                >= $this->request->contentLength) {
-                //$this->request->close();
-              }
-            })->on('end', function () {
+            $this->request->on('end', function () {
               $this->expecting = static::EXPECTING_REQUEST_LINE;
             })->on('close', function () {
               $this->removeAllListeners();

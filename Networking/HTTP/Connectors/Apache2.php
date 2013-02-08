@@ -43,10 +43,13 @@ class Apache2 extends Event\Emitter implements HTTP\Interfaces\Server {
     $connection->on('end', function () use ($request) {
       $request->emit('end');
     });
-    $connection->on('data', function ($data) use ($request) {
+    $connection->on('data', function ($data) use ($request, $connection) {
       $request->emit('data', array(
         $data
       ));
+      if (feof($connection->input)) {
+        $request->close();
+      }
     });
     $request->on('pause', function () use ($connection) {
       $connection->emit('pause');

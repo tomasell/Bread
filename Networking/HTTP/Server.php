@@ -59,9 +59,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
     $response = new Response($request);
     $response->once('headers', function ($response) {
       $response->write((string) $response);
-    })->on('close', array(
-      $request, 'close'
-    ));
+    });
     if (!$this->listeners('request')) {
       $response->end();
       return;
@@ -80,11 +78,18 @@ class Server extends Event\Emitter implements Interfaces\Server {
     $this->emit('request', array(
       $request, $response
     ));
+    $request->on('data', function ($data) use ($request) {
+      $request->receivedLength += strlen($data);
+      printf("Received %d of %d\n", $request->receivedLength, $request->contentLength);
+      if ($request->receivedLength >= $request->contentLength) {
+        $request->close();
+      }
+    });
     if ((isset($request->headers['Content-Length'])
       || isset($request->headers['Transfer-Encoding']))) {
       is_null($data) || $request->emit('data', array(
-        $data
-      ));
+          $data
+        ));
     }
     else {
       $request->close();

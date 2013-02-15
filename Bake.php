@@ -25,6 +25,16 @@ require 'Core' . DIRECTORY_SEPARATOR . 'ClassLoader.php';
 define('DS', DIRECTORY_SEPARATOR);
 
 /**
+ * Define a namespace separator
+ */
+define('NAMESPACE_SEPARATOR', "\\");
+
+/**
+ * Define a shortcut for NAMESPACE_SEPARATOR
+ */
+define('NS', NAMESPACE_SEPARATOR);
+
+/**
  * Define the framework's base directory
  */
 if (!defined('BREAD_BASE')) {

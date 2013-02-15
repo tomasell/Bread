@@ -16,14 +16,15 @@
 namespace Bread;
 
 use JsonSerializable;
-use SplObjectStorage, SplObserver, SplSubject;
 
 abstract class Model implements JsonSerializable {
-  protected static $observers;
+  protected static $configuration = array(
+    'database' => 'mongodb://localhost/test'
+  );
+
+  protected static $database;
 
   public function __construct($attributes = array()) {
-    //parent::__construct();
-    //static::$observers->attach($this, new SplObjectStorage());
     foreach ($attributes as $attribute => $value) {
       $this->__set($attribute, $value);
     }
@@ -34,7 +35,7 @@ abstract class Model implements JsonSerializable {
   }
 
   public function __set($attribute, $value) {
-    //$this->validate($attribute, $value);
+    $this->validate($attribute, $value);
     $this->$attribute = $value;
   }
 
@@ -50,17 +51,18 @@ abstract class Model implements JsonSerializable {
     return $this->attributes();
   }
 
-  public function attach(SplObserver $view) {
-    static::$observers->offsetGet($this)->attach($view);
+  public function store() {
+    static::$database->store($this);
   }
 
-  public function detach(SplObserver $view) {
-    static::$observers->offsetGet($this)->detach($view);
+  protected function validate($attribute, $value) {
   }
 
-  public function notify() {
-    foreach (static::$observers->offsetGet($this) as $observer) {
-      $observer->update($this);
-    }
+  public static function configure($configuration = array()) {
+    static::$database = new Model\Database(static::$configuration['database']);
+  }
+
+  public static function count($search = array(), $options = array()) {
+    return static::$database->count(get_called_class(), $search, $options);
   }
 }

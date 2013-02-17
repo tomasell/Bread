@@ -301,7 +301,7 @@ abstract class Message extends Event\Emitter implements
       ));
     }
     return implode("\r\n", array(
-      $this->startLine, (string) $this->headers
+      $this->startLine, (string) $this->headers, null
     ));
   }
 

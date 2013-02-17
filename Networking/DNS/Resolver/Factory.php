@@ -26,34 +26,34 @@ use Bread\Event\Interfaces\Loop;
 use Bread\Cache;
 
 class Factory {
-  public function create($nameserver, Loop $loop) {
-    $nameserver = $this->addPortToServerIfMissing($nameserver);
-    $executor = $this->createRetryExecutor($loop);
+  public static function create($nameserver, Loop $loop) {
+    $nameserver = static::addPortToServerIfMissing($nameserver);
+    $executor = static::createRetryExecutor($loop);
 
     return new Resolver($nameserver, $executor);
   }
 
-  public function createCached($nameserver, Loop $loop) {
-    $nameserver = $this->addPortToServerIfMissing($nameserver);
-    $executor = $this->createCachedExecutor($loop);
+  public static function createCached($nameserver, Loop $loop) {
+    $nameserver = static::addPortToServerIfMissing($nameserver);
+    $executor = static::createCachedExecutor($loop);
 
     return new Resolver($nameserver, $executor);
   }
 
-  protected function createExecutor(Loop $loop) {
+  protected static function createExecutor(Loop $loop) {
     return new Executor($loop, new Parser(), new BinaryDumper());
   }
 
-  protected function createRetryExecutor(Loop $loop) {
-    return new RetryExecutor($this->createExecutor($loop));
+  protected static function createRetryExecutor(Loop $loop) {
+    return new RetryExecutor(static::createExecutor($loop));
   }
 
-  protected function createCachedExecutor(Loop $loop) {
-    return new CachedExecutor($this->createRetryExecutor($loop),
+  protected static function createCachedExecutor(Loop $loop) {
+    return new CachedExecutor(static::createRetryExecutor($loop),
       new RecordCache(Cache::factory()));
   }
 
-  protected function addPortToServerIfMissing($nameserver) {
+  protected static function addPortToServerIfMissing($nameserver) {
     return false === strpos($nameserver, ':') ? "$nameserver:53" : $nameserver;
   }
 }

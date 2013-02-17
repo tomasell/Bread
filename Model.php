@@ -75,7 +75,16 @@ abstract class Model implements JsonSerializable {
   }
 
   public static function first($search = array(), $options = array()) {
-    return static::$database->first(get_called_class(), $search, $options);
+    array_multisort($search, $options);
+    $key = get_called_class() . md5(json_encode($search + $options));
+    return static::$cache->get($key)->then(null, function ($key) use ($search,
+      $options) {
+      return static::$database->first(get_called_class(), $search, $options)->then(function (
+        $result) use ($key) {
+        static::$cache->set($key, $result);
+        return $result;
+      });
+    });
   }
 
   public static function fetch($search = array(), $options = array()) {

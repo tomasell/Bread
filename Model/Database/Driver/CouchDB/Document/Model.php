@@ -13,30 +13,11 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache\Engine;
+namespace Bread\Model\Database\Driver\CouchDB\Document;
 
 use Bread;
-use Bread\Promise\When;
 
-class Internal implements Bread\Interfaces\Cache {
-  private $data = array();
-
-  public function get($key) {
-    if (!isset($this->data[$key])) {
-      return When::reject($key);
-    }
-    return When::resolve($this->data[$key]);
-  }
-
-  public function set($key, $value) {
-    $this->data[$key] = $value;
-  }
-
-  public function remove($key) {
-    unset($this->data[$key]);
-  }
-
-  public function clear() {
-    $this->data = array();
-  }
+class Model extends Bread\Model {
+  public $_id;
+  public $_rev;
 }

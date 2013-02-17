@@ -13,30 +13,24 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache\Engine;
+namespace Bread\Model\Database\Driver\CouchDB\Design\Document;
 
-use Bread;
-use Bread\Promise\When;
+use Bread\Model\Database\Driver\CouchDB\Document;
 
-class Internal implements Bread\Interfaces\Cache {
-  private $data = array();
+class Model extends Document\Model {
+  public $language;
+  public $views;
 
-  public function get($key) {
-    if (!isset($this->data[$key])) {
-      return When::reject($key);
+  public function __construct($name, $views = array(), $language = 'javascript') {
+    $this->_id = "_design/{$name}";
+    $this->language = $language;
+    $this->views = $views;
+  }
+
+  public function view($name, $map, $reduce = null) {
+    $this->views[$name]['map'] = $map;
+    if ($reduce) {
+      $this->views[$name]['reduce'] = $reduce;
     }
-    return When::resolve($this->data[$key]);
-  }
-
-  public function set($key, $value) {
-    $this->data[$key] = $value;
-  }
-
-  public function remove($key) {
-    unset($this->data[$key]);
-  }
-
-  public function clear() {
-    $this->data = array();
   }
 }

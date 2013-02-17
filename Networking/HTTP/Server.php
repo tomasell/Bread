@@ -56,7 +56,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
 
   public function handleRequest(Networking\Interfaces\Connection $conn,
     Request\Parser $parser, Request $request, $data) {
-    $response = new Response($request);
+    $response = new Response($conn);
     $response->once('headers', function ($response) {
       $response->write((string) $response);
     });

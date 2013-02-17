@@ -15,6 +15,7 @@
 
 namespace Bread\Networking\HTTP;
 
+use Bread\Networking\Interfaces\Connection;
 use Bread\Networking;
 use Bread\Stream;
 use DateTime;
@@ -82,14 +83,13 @@ class Response extends Message {
     510 => "Not Extended"
   );
 
-  public function __construct(Request $request, $status = 200, $body = null,
+  public function __construct(Connection $connection, $status = 200, $body = null,
     $headers = array(), $protocol = 'HTTP/1.1') {
-    $this->request = $request;
     $this->status($status, $protocol);
     if (isset($this->request->headers['Connection'])) {
       $headers['Connection'] = $this->request->headers['Connection'];
     }
-    parent::__construct($request->connection, $protocol, $this->statusLine, $headers, $body);
+    parent::__construct($connection, $protocol, $this->statusLine, $headers, $body);
   }
 
   public function status($status, $protocol = 'HTTP/1.1') {

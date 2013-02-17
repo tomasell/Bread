@@ -23,7 +23,7 @@ class APC implements Bread\Interfaces\Cache {
   public function get($key) {
     $result = apc_fetch($key, $success);
     if (!$success) {
-      return When::reject();
+      return When::reject($key);
     }
     return When::resolve($result);
   }

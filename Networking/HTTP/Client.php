@@ -15,33 +15,64 @@
 
 namespace Bread\Networking\HTTP;
 
+use Bread\Networking\Interfaces\Connection;
+
+use Bread\Promise\Deferred;
+
 use Bread\Networking;
 use Bread\Event;
 
 class Client {
   private $loop;
+  private $protocol;
+  private $resolver;
 
-  public function __construct(Event\Interfaces\Loop $loop) {
+  public function __construct(Event\Interfaces\Loop $loop,
+    $nameserver = '127.0.1.1', $protocol = 'HTTP/1.1') {
     $this->loop = $loop;
+    $this->protocol = $protocol;
+    $this->resolver = Networking\DNS\Resolver\Factory::create($nameserver, $loop);
   }
 
-  public function get($url, $headers = array(), $protocol = 'HTTP/1.1') {
-    $client = new Networking\Client($this->loop);
+  public function get($url, $headers = array()) {
     $host = parse_url($url, PHP_URL_HOST);
-    $port = parse_url($url, PHP_URL_PORT);
-    $path = parse_url($url, PHP_URL_PATH);
-    $client->connect($host, $port)->then(function ($connection) use ($path) {
-      $this->handleConnection($connection);
-      $request = new Request($connection, 'GET', $path, $protocol, $headers);
-      $request->end($request);
+    if ($this->protocol === 'HTTP/1.1' && !isset($headers['Host'])) {
+      $headers['Host'] = $host;
+    }
+    $deferred = new Deferred();
+    $this->resolver->resolve($host)->then(function ($ip) use ($url, $headers,
+      $deferred) {
+      $port = parse_url($url, PHP_URL_PORT) ?: 80;
+      $client = new Networking\Client($this->loop);
+      $client->connect($ip, $port)->then(function ($connection) use ($url,
+        $headers, $deferred) {
+        $path = parse_url($url, PHP_URL_PATH);
+        $this->handleConnection($deferred, $connection);
+        $request = new Request($connection, 'GET', $path, $this->protocol,
+          $headers);
+        $request->end($request);
+      });
+    }, function ($e) {
+      var_dump($e->getMessage());
+    });
+    return $deferred->promise();
+  }
+
+  public function getJSON($url, $headers = array()) {
+    return $this->get($url, $headers)->then(function($response, $data) {
+      $json = $data;
+      $response->on('data', function($data) use(&$json) {
+        $json .= $data;
+      })->on('end', function() use ($promise, &$json) {
+        $promise->resolve($json);
+      });
     });
   }
 
-  public function handleConnection($connection) {
+  protected function handleConnection(Deferred $promise, Connection $connection) {
     $parser = new Response\Parser();
     $parser->on('headers', function (Response $response, $data) use (
-      $connection, $parser) {
-      $this->handleResponse($conn, $parser, $response, $data);
+      $connection, $parser, $promise) {
       $connection->removeListener('data', array(
         $parser, 'parse'
       ));
@@ -59,14 +90,11 @@ class Client {
       $response->on('resume', function () use ($connection) {
         $connection->emit('resume');
       });
+      $promise->resolve(array($response, $data));
     });
     $connection->on('data', array(
       $parser, 'parse'
     ));
-  }
-
-  public function handleResponse(Networking\Interfaces\Connection $conn,
-      Response\Parser $parser, Response $response, $data) {
   }
 }
 

@@ -13,20 +13,9 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Networking\DNS\Exceptions;
 
-use Bread\Promise\Deferred;
-use Bread;
+use Exception;
 
-class Promise implements Bread\Interfaces\Promise {
-  private $deferred;
-
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
-  }
-
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
-  }
+class BadServer extends Exception {
 }

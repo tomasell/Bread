@@ -13,20 +13,20 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Networking\DNS\Model;
 
-use Bread\Promise\Deferred;
-use Bread;
+class Record {
+  public $name;
+  public $type;
+  public $class;
+  public $ttl;
+  public $data;
 
-class Promise implements Bread\Interfaces\Promise {
-  private $deferred;
-
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
-  }
-
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
+  public function __construct($name, $type, $class, $ttl = 0, $data = null) {
+    $this->name = $name;
+    $this->type = $type;
+    $this->class = $class;
+    $this->ttl = $ttl;
+    $this->data = $data;
   }
 }

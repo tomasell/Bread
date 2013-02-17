@@ -13,7 +13,7 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache\Engines;
+namespace Bread\Cache\Engine;
 
 use Bread;
 use Bread\Promise\When;

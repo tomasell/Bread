@@ -33,11 +33,19 @@ class Database {
     $this->driver = new $Driver($url);
   }
 
+  public function store(Bread\Model $model) {
+    return $this->driver->store($model);
+  }
+
   public function count($class, $search = array(), $options = array()) {
     return $this->driver->count($class, $search, $options);
   }
 
-  public function store(Bread\Model $model) {
-    return $this->driver->store($model);
+  public function first($class, $search = array(), $options = array()) {
+    return $this->driver->first($class, $search, $options);
+  }
+
+  public function fetch($class, $search = array(), $options = array()) {
+    return $this->driver->fetch($class, $search, $options);
   }
 }

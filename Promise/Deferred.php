@@ -86,14 +86,14 @@ class Deferred implements Bread\Interfaces\Promise, Interfaces\Resolver,
 
   public function promise() {
     if (null === $this->promise) {
-      $this->promise = new static($this);
+      $this->promise = new Deferred\Promise($this);
     }
     return $this->promise;
   }
 
   public function resolver() {
     if (null === $this->resolver) {
-      $this->resolver = new static($this);
+      $this->resolver = new Deferred\Resolver($this);
     }
     return $this->resolver;
   }

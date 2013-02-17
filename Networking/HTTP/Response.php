@@ -19,13 +19,10 @@ use Bread\Networking;
 use Bread\Stream;
 use DateTime;
 
-class Response extends Message implements Stream\Interfaces\Writable {
+class Response extends Message {
   public $statusLine;
   public $status;
   public $reason;
-  private $chunkedEncoding = false;
-  private $writable = true;
-  private $closed = false;
 
   protected static $statusCodes = array(
     100 => "Continue",
@@ -89,11 +86,10 @@ class Response extends Message implements Stream\Interfaces\Writable {
     $headers = array(), $protocol = 'HTTP/1.1') {
     $this->request = $request;
     $this->status($status, $protocol);
+    if (isset($this->request->headers['Connection'])) {
+      $headers['Connection'] = $this->request->headers['Connection'];
+    }
     parent::__construct($request->connection, $protocol, $this->statusLine, $headers, $body);
-  }
-
-  public function isWritable() {
-    return $this->writable;
   }
 
   public function status($status, $protocol = 'HTTP/1.1') {
@@ -102,45 +98,5 @@ class Response extends Message implements Stream\Interfaces\Writable {
     $this->startLine = $this->statusLine = implode(' ', array(
       $protocol, $this->status, $this->reason
     ));
-  }
-
-  public function write($data) {
-    $this->emit('headers', array(
-      $this
-    ));
-    if ($this->chunkedEncoding) {
-      $len = strlen($data);
-      $chunk = dechex($len) . "\r\n" . $data . "\r\n";
-      $flushed = $this->connection->write($chunk);
-    }
-    else {
-      $flushed = $this->connection->write($data);
-    }
-    return $flushed;
-  }
-
-  public function end($data = null) {
-    if (null !== $data) {
-      $this->write($data);
-    }
-    if ($this->chunkedEncoding) {
-      $this->connection->write("0\r\n\r\n");
-    }
-    $this->emit('close');
-    $this->removeAllListeners();
-    if ('close' === $this->request->headers['Connection']) {
-      $this->connection->end();
-    }
-  }
-
-  public function close() {
-    if ($this->closed) {
-      return;
-    }
-    $this->closed = true;
-    $this->writable = false;
-    $this->emit('close');
-    $this->removeAllListeners();
-    $this->connection->close();
   }
 }

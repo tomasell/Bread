@@ -13,20 +13,10 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Networking\DNS\Query\Interfaces;
 
-use Bread\Promise\Deferred;
-use Bread;
+use Bread\Networking\DNS\Query;
 
-class Promise implements Bread\Interfaces\Promise {
-  private $deferred;
-
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
-  }
-
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
-  }
+interface Executor {
+  public function query($nameserver, Query $query);
 }

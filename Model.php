@@ -47,8 +47,16 @@ abstract class Model implements JsonSerializable {
     $this->__set($attribute, null);
   }
 
+  public function __toString() {
+    return $this->attributes();
+  }
+
   public function jsonSerialize() {
     return $this->attributes();
+  }
+
+  public function attributes() {
+    return get_object_vars($this);
   }
 
   public function store() {
@@ -64,5 +72,13 @@ abstract class Model implements JsonSerializable {
 
   public static function count($search = array(), $options = array()) {
     return static::$database->count(get_called_class(), $search, $options);
+  }
+
+  public static function first($search = array(), $options = array()) {
+    return static::$database->first(get_called_class(), $search, $options);
+  }
+
+  public static function fetch($search = array(), $options = array()) {
+    return static::$database->fetch(get_called_class(), $search, $options);
   }
 }

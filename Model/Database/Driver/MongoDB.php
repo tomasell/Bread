@@ -13,10 +13,12 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Database;
+namespace Bread\Model\Database\Driver;
 
 use Bread;
-use MongoClient;
+use Bread\Model\Database\Interfaces;
+use DateTime;
+use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
 
 class MongoDB implements Interfaces\Driver {
   protected $client;
@@ -26,6 +28,18 @@ class MongoDB implements Interfaces\Driver {
     $database = ltrim(parse_url($url, PHP_URL_PATH), '/');
     $this->client = new MongoClient($url);
     $this->link = $this->client->$database;
+  }
+
+  public function store(Bread\Model $model) {
+    $collection = $this->collection(get_class($model));
+    $this->link->$collection->save($model);
+    return $model;
+  }
+
+  public function delete(Bread\Model $model) {
+  }
+
+  public function purge($class) {
   }
 
   public function count($class, $search = array(), $options = array()) {
@@ -43,21 +57,10 @@ class MongoDB implements Interfaces\Driver {
     $documents = $this->cursor($class, $search, $options);
     foreach ($documents as $document) {
       $this->normalizeDocument($class, $document);
-      $model = new $class($document);
-      $models[] = $model;
+      //$model = new $class($document);
+      $models[] = $document;//$model;
     }
     return $models;
-  }
-
-  public function store(Bread\Model $model) {
-    $collection = $this->collection(get_class($model));
-    return $this->link->$collection->save($model);
-  }
-
-  public function delete(Bread\Model $model) {
-  }
-
-  public function purge($class) {
   }
 
   protected function cursor($class, $search = array(), $options = array()) {
@@ -87,7 +90,35 @@ class MongoDB implements Interfaces\Driver {
 
   protected function normalizeDocument($class, &$document) {
     foreach ($document as $attribute => &$value) {
-      //$this->normalizeValue($class, $attribute, $value);
+      if ($value instanceof MongoId) {
+        $value = (string) $value;
+      }
+      elseif ($value instanceof MongoDate) {
+        $value = new DateTime('@' . $value->sec);
+      }
+      elseif ($value instanceof MongoBinData) {
+        $value = (string) $value;
+      }
+      elseif (MongoDBRef::isRef($value)) {
+        $this->normalizeReference($value);
+      }
+      elseif (is_array($value)) {
+        $this->normalizeDocument($class, $value);
+      }
     }
+  }
+
+  protected function normalizeReference(&$reference) {
+    $document = MongoDBRef::get($this->link, $reference);
+    $class = $this->className($reference['$ref']);
+    $reference = $class::first($document);
+  }
+
+  protected function denormalizeReference(&$model) {
+    $class = get_class($model);
+    if (!$first = $this->first($class, $model->attributes())) {
+      $first = $this->store($model);
+    }
+    MongoDBRef::create($this->collection($class), new MongoId($first->_id));
   }
 }

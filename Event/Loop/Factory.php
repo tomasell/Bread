@@ -13,16 +13,16 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Event;
+namespace Bread\Event\Loop;
 
-class Loop {
-  public static function factory() {
+class Factory {
+  public static function create() {
     if (class_exists('libev\EventLoop')) {
-      return new Loop\LibEv();
+      return new LibEv();
     }
     if (function_exists('event_base_new')) {
-      return new Loop\LibEvent();
+      return new LibEvent();
     }
-    return new Loop\StreamSelect();
+    return new StreamSelect();
   }
 }

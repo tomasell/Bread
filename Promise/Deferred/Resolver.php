@@ -15,6 +15,7 @@
 
 namespace Bread\Promise\Deferred;
 
+use Bread\Promise\Deferred;
 use Bread\Promise;
 
 class Resolver implements Promise\Interfaces\Resolver {

@@ -13,10 +13,9 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Networking\HTTP;
+namespace Bread\Networking\HTTP\Response;
 
-use Bread\Stream;
-
+use Bread\Networking\HTTP\Request;
 use Bread\Event;
 
 class Parser extends Event\Emitter {

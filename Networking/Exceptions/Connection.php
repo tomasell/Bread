@@ -17,5 +17,5 @@ namespace Bread\Networking\Exceptions;
 
 use ErrorException;
 
-class ConnectionException extends ErrorException {
+class Connection extends ErrorException {
 }

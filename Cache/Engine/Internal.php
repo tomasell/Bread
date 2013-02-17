@@ -13,20 +13,30 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Cache\Engine;
 
-use Bread\Promise\Deferred;
 use Bread;
+use Bread\Promise\When;
 
-class Promise implements Bread\Interfaces\Promise {
-  private $deferred;
+class Internal implements Bread\Interfaces\Cache {
+  private $data = array();
 
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
+  public function get($key) {
+    if (!isset($this->data[$key])) {
+      return When::reject();
+    }
+    return When::resolve($this->data[$key]);
   }
 
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
+  public function set($key, $value) {
+    $this->data[$key] = $value;
+  }
+
+  public function remove($key) {
+    unset($this->data[$key]);
+  }
+
+  public function clear() {
+    $this->data = array();
   }
 }

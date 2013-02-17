@@ -13,20 +13,24 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Networking\DNS\Query;
 
-use Bread\Promise\Deferred;
-use Bread;
+use Bread\Networking\DNS\Model\Message;
+use Bread\Networking\DNS\Model\Record;
 
-class Promise implements Bread\Interfaces\Promise {
-  private $deferred;
+class RecordBag {
+  private $records = array();
 
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
+  public function set($currentTime, Record $record) {
+    $this->records[$record->data] = array(
+      $currentTime + $record->ttl, $record
+    );
   }
 
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
+  public function all() {
+    return array_values(array_map(function ($value) {
+      list($expiresAt, $record) = $value;
+      return $record;
+    }, $this->records));
   }
 }

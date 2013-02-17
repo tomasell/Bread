@@ -18,8 +18,8 @@ namespace Bread;
 class Cache {
   public static function factory() {
     if (class_exists('APCIterator')) {
-      return new Cache\APC();
+      return new Cache\Engine\APC();
     }
-    return new Cache\Internal();
+    return new Cache\Engine\Internal();
   }
 }

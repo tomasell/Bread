@@ -13,30 +13,9 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache\Engines;
+namespace Bread\Networking\DNS\Exceptions;
 
-use Bread;
-use Bread\Promise\When;
+use Exception;
 
-class Internal implements Bread\Interfaces\Cache {
-  private $data = array();
-
-  public function get($key) {
-    if (!isset($this->data[$key])) {
-      return When::reject();
-    }
-    return When::resolve($this->data[$key]);
-  }
-
-  public function set($key, $value) {
-    $this->data[$key] = $value;
-  }
-
-  public function remove($key) {
-    unset($this->data[$key]);
-  }
-
-  public function clear() {
-    $this->data = array();
-  }
+class RecordNotFound extends Exception {
 }

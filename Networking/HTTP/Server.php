@@ -26,7 +26,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
     $this->io->on('connection', function ($conn) {
       // TODO: chunked transfer encoding
       // TODO: multipart parsing
-      $parser = new Parser();
+      $parser = new Request\Parser();
       $parser->on('headers', function (Request $request, $data) use ($conn,
         $parser) {
         $this->handleRequest($conn, $parser, $request, $data);
@@ -55,7 +55,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
   }
 
   public function handleRequest(Networking\Interfaces\Connection $conn,
-    Parser $parser, Request $request, $data) {
+    Request\Parser $parser, Request $request, $data) {
     $response = new Response($request);
     $response->once('headers', function ($response) {
       $response->write((string) $response);
@@ -82,7 +82,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
       $request->receivedLength += strlen($data);
       printf("Received %d of %d\n", $request->receivedLength, $request->contentLength);
       if ($request->receivedLength >= $request->contentLength) {
-        $request->close();
+        $request->end();
       }
     });
     if ((isset($request->headers['Content-Length'])
@@ -92,7 +92,7 @@ class Server extends Event\Emitter implements Interfaces\Server {
         ));
     }
     else {
-      $request->close();
+      $request->end();
     }
   }
 

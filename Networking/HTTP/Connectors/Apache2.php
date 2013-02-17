@@ -48,7 +48,7 @@ class Apache2 extends Event\Emitter implements HTTP\Interfaces\Server {
         $data
       ));
       if (feof($connection->input)) {
-        $request->close();
+        $request->end();
       }
     });
     $request->on('pause', function () use ($connection) {

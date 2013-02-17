@@ -17,13 +17,21 @@ namespace Bread\Networking\HTTP;
 
 use Bread\Networking;
 use Bread\Event;
+use Bread\Stream;
 
-abstract class Message extends Event\Emitter {
+abstract class Message extends Event\Emitter implements
+  Stream\Interfaces\Readable, Stream\Interfaces\Writable {
+  use Stream\Traits\Pipe;
+
   public $connection;
   public $startLine;
   public $protocol;
   public $headers;
   public $body;
+  protected $readable = true;
+  protected $writable = true;
+  protected $closed = false;
+  protected $chunkedEncoding = false;
 
   protected $mimeTypes = array(
     'html' => array(
@@ -256,8 +264,8 @@ abstract class Message extends Event\Emitter {
     'vtt' => 'text/vtt',
   );
 
-  public function __construct(Networking\Interfaces\Connection $connection, $protocol = 'HTTP/1.1',
-    $startLine = '', $headers = array(), $body = null) {
+  public function __construct(Networking\Interfaces\Connection $connection,
+    $protocol = 'HTTP/1.1', $startLine = '', $headers = array(), $body = null) {
     $this->connection = $connection;
     $this->protocol = $protocol;
     $this->startLine = $startLine;
@@ -274,29 +282,27 @@ abstract class Message extends Event\Emitter {
   public function __get($name) {
     switch ($name) {
     case 'contentType':
-      return isset($this->headers['Content-Type']) ? $this
-          ->headers['Content-Type'] : null;
+      return isset($this->headers['Content-Type']) ? $this->headers['Content-Type']
+        : null;
     case 'contentLength':
-      return isset($this->headers['Content-Length']) ? (int) $this
-          ->headers['Content-Length'] : null;
+      return isset($this->headers['Content-Length']) ? (int) $this->headers['Content-Length']
+        : null;
     }
   }
 
   public function __toString() {
     if ($this->contentLength) {
       rewind($this->body);
-      return implode("\r\n",
-        array(
-          $this->startLine,
-          (string) $this->headers,
-          null,
-          fread($this->body, $this->contentLength)
-        ));
-    }
-    return implode("\r\n",
-      array(
-        $this->startLine, (string) $this->headers
+      return implode("\r\n", array(
+        $this->startLine,
+        (string) $this->headers,
+        null,
+        fread($this->body, $this->contentLength)
       ));
+    }
+    return implode("\r\n", array(
+      $this->startLine, (string) $this->headers
+    ));
   }
 
   public function header($name, $value, $parameters = array()) {
@@ -311,5 +317,67 @@ abstract class Message extends Event\Emitter {
       $this->body = $body;
     }
     return $this->body;
+  }
+
+  public function isReadable() {
+    return $this->readable;
+  }
+
+  public function isWritable() {
+    return $this->writable;
+  }
+
+  public function pause() {
+    $this->emit('pause');
+  }
+
+  public function resume() {
+    $this->emit('resume');
+  }
+
+  public function write($data) {
+    $this->emit('headers', array(
+      $this
+    ));
+    if ($this->chunkedEncoding) {
+      $len = strlen($data);
+      $chunk = dechex($len) . "\r\n" . $data . "\r\n";
+      $flushed = $this->connection->write($chunk);
+    }
+    else {
+      $flushed = $this->connection->write($data);
+    }
+    return $flushed;
+  }
+
+  public function end($data = null) {
+    if (null !== $data) {
+      $this->write($data);
+    }
+    else {
+      $this->emit('headers', array($this));
+    }
+    if ($this->chunkedEncoding) {
+      $this->connection->write("0\r\n\r\n");
+    }
+    $this->emit('end');
+    $this->removeAllListeners();
+    if ('close' === $this->headers['Connection']) {
+      $this->close();
+    }
+  }
+
+  public function close() {
+    if ($this->closed) {
+      return;
+    }
+    $this->emit('headers', array($this));
+    $this->emit('end');
+    $this->readable = false;
+    $this->writable = false;
+    $this->emit('close');
+    $this->closed = true;
+    $this->removeAllListeners();
+    $this->connection->end();
   }
 }

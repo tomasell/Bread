@@ -13,7 +13,7 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Interfaces;
+namespace Bread\Promise\Interfaces;
 
 interface Promisor {
   public function promise();

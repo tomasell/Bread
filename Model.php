@@ -15,6 +15,7 @@
 
 namespace Bread;
 
+use Bread\Model;
 use JsonSerializable;
 
 abstract class Model implements JsonSerializable {
@@ -67,7 +68,7 @@ abstract class Model implements JsonSerializable {
   }
 
   public static function configure($configuration = array()) {
-    static::$database = new Model\Database(static::$configuration['database']);
+    static::$database = Model\Database\Factory::create(static::$configuration['database']);
   }
 
   public static function count($search = array(), $options = array()) {

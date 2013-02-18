@@ -13,11 +13,11 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Database\Interfaces;
+namespace Bread\Model\Interfaces;
 
 use Bread;
 
-interface Driver {
+interface Database {
   public function count($class, $search = array(), $options = array());
   public function first($class, $search = array(), $options = array());
   public function fetch($class, $search = array(), $options = array());

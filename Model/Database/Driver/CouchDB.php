@@ -15,8 +15,9 @@
 
 namespace Bread\Model\Database\Driver;
 
-use Bread;
 use Bread\Model\Database\Interfaces;
+use Bread\Networking\HTTP;
+use Bread;
 use DateTime;
 
 class CouchDB implements Interfaces\Driver {

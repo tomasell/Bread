@@ -13,39 +13,25 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model;
+namespace Bread\Model\Database;
 
 use Bread, Exception;
 
-class Database {
+class Factory {
   protected static $configuration = array(
     'drivers' => array(
-      'mongodb' => 'Bread\Model\Database\MongoDB'
+      'mongodb' => 'Bread\Model\Database\Driver\MongoDB',
+      'couchdb' => 'Bread\Model\Database\Driver\CouchDB',
+      'mysql' => 'Bread\Model\Database\Driver\MySQL'
     )
   );
 
-  public function __construct($url) {
+  public static function create($url) {
     $scheme = parse_url($url, PHP_URL_SCHEME);
     if (!isset(static::$configuration['drivers'][$scheme])) {
       throw new Exception('Driver for {$scheme} not found.');
     }
     $Driver = static::$configuration['drivers'][$scheme];
-    $this->driver = new $Driver($url);
-  }
-
-  public function store(Bread\Model $model) {
-    return $this->driver->store($model);
-  }
-
-  public function count($class, $search = array(), $options = array()) {
-    return $this->driver->count($class, $search, $options);
-  }
-
-  public function first($class, $search = array(), $options = array()) {
-    return $this->driver->first($class, $search, $options);
-  }
-
-  public function fetch($class, $search = array(), $options = array()) {
-    return $this->driver->fetch($class, $search, $options);
+    return new $Driver($url);
   }
 }

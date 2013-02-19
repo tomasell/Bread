@@ -29,7 +29,7 @@ class Headers implements ArrayAccess, Countable, IteratorAggregate {
       array_map(
         function ($offset, $value) {
           return "{$offset}: {$value}";
-        }, array_keys($this->headers), $this->headers)) . "\r\n";
+        }, array_keys($this->headers), $this->headers));
   }
 
   public function offsetExists($offset) {

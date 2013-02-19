@@ -20,13 +20,15 @@ use Bread\View\Helpers\DOM;
 class Page extends DOM\Document {
   public function __construct() {
     parent::__construct('html');
-    $this->head = $this->root->append('head');
-    $this->title = $this->head->append('title');
-    $this->body = $this->root->append('body');
+    $this->head = $this->root->append('<head></head>');
+    $this->charset = $this->head->append('<meta/>');
+    $this->charset->attr('charset', 'utf-8');
+    $this->title = $this->head->append('<title/>');
+    $this->body = $this->root->append('<body/>');
   }
 
-  public function save($node = null) {
+  public function save($node = null, $options = LIBXML_NOXMLDECL) {
     return $this->document->saveHTML($node);
-    return parent::save($node, LIBXML_NOXMLDECL);
+    return parent::save($node, $options);
   }
 }

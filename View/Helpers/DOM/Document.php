@@ -34,6 +34,16 @@ class Document {
     $this->root = new Node($this, $this->document->documentElement);
   }
 
+  public function __invoke($name) {
+    if (preg_match('/^</', $name)) {
+      $fragment = $this->document->createDocumentFragment();
+      $fragment->appendXML($name);
+      $node = $fragment->removeChild($fragment->firstChild);
+      return new Node($this, $node);
+    }
+    return new Node($this, $this->selector($name));
+  }
+
   public function __toString() {
     return $this->save();
   }
@@ -66,8 +76,14 @@ class Document {
     }
     return $element;
   }
-  
+
   public function save($node = null, $options = 0) {
     return $this->document->saveXML($node, $options);
+  }
+
+  // TODO move selector to HTML (because it assumes #id and .class)
+  protected function selector($selector) {
+    $xpath = Selector::toXPath($selector);
+    return $this->xpath->query($xpath);
   }
 }

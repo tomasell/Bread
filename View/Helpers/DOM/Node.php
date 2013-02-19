@@ -70,7 +70,7 @@ class Node implements Interfaces\Node {
       }
     }
   }
-  
+
   public function current() {
     return new Node($this->document, $this->nodes[$this->position]);
   }
@@ -101,12 +101,7 @@ class Node implements Interfaces\Node {
    */
   public function after($content) {
     if (!($content instanceof Node)) {
-      $args = func_get_args();
-      array_unshift($args, $this->document);
-      $content = call_user_func_array(array(
-          $this, '__construct'
-      ), $args);
-      var_dump($content);
+      $content = $this->document->__invoke($content);
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -124,14 +119,9 @@ class Node implements Interfaces\Node {
    */
   public function append($content) {
     if (!($content instanceof Node)) {
-      $args = func_get_args();
-      array_unshift($args, $this->document);
-      $content = call_user_func_array(array(
-          $this, '__construct'
-      ), $args);
+      $content = $this->document->__invoke($content);
     }
     foreach ($this->nodes as $i => $node) {
-      var_dump($content->nodes);
       foreach ($content->nodes as $n) {
         if ($i) {
           $n = $n->cloneNode(true);
@@ -139,6 +129,7 @@ class Node implements Interfaces\Node {
         $node->appendChild($n);
       }
     }
+    return $content;
   }
 
   /**
@@ -158,11 +149,7 @@ class Node implements Interfaces\Node {
   public function attr($attributes) {
     $args = func_get_args();
     if (is_array($attributes)) {
-      foreach ($attributes as $attribute => $value) {
-        foreach ($this->nodes as $node) {
-          $node->setAttributes($attribute, $value);
-        }
-      }
+      $content = $this->document->__invoke($content);
     }
     elseif (!isset($args[1])) {
       return $this->nodes[0]->getAttribute($attributes);
@@ -178,11 +165,7 @@ class Node implements Interfaces\Node {
    */
   public function before($content) {
     if (!($content instanceof Node)) {
-      $args = func_get_args();
-      array_unshift($args, $this->document);
-      $content = call_user_func_array(array(
-          $this, '__construct'
-      ), $args);
+      $content = $this->document->__invoke($content);
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -227,11 +210,7 @@ class Node implements Interfaces\Node {
    */
   public function prepend($content) {
     if (!($content instanceof Node)) {
-      $args = func_get_args();
-      array_unshift($args, $this->document);
-      $content = call_user_func_array(array(
-          $this, '__construct'
-      ), $args);
+      $content = $this->document->__invoke($content);
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {

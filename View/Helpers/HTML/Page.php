@@ -20,6 +20,9 @@ use Bread\View\Helpers\DOM;
 class Page extends DOM\Document {
   public function __construct() {
     parent::__construct('html');
+    $this->head = $this->root->append('head');
+    $this->title = $this->head->append('title');
+    $this->body = $this->root->append('body');
   }
 
   public function save($node = null) {

@@ -21,25 +21,25 @@ interface Node extends DOM\Interfaces\Node {
   /**
    * Adds the specified class(es) to each of the set of matched elements.
    */
-  public function addClass();
+  public function addClass($class);
 
   /**
    * Determine whether any of the matched elements are assigned the given class.
    */
-  public function hasClass();
+  public function hasClass($class);
 
   /**
    * Remove a single class, multiple classes, or all classes from each element
    * in the set of matched elements.
    */
-  public function removeClass();
+  public function removeClass($class);
 
   /**
    * Add or remove one or more classes from each element in the set of matched
    * elements, depending on either the class’s presence or the value of the
    * switch argument.
    */
-  public function toggleClass();
+  public function toggleClass($class);
 
   /**
    * Get the HTML contents of the first element in the set of matched elements

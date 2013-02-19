@@ -15,9 +15,10 @@
 
 namespace Bread\View\Helpers\DOM;
 
-use DOMNode, DOMNodeList;
+use DOMNodeList, DOMNode, DOMText;
 
 class Node implements Interfaces\Node {
+  protected $position;
   protected $document;
   protected $nodes = array();
 
@@ -25,10 +26,14 @@ class Node implements Interfaces\Node {
     $attributes = array()) {
     $this->document = $document;
     if (is_string($name)) {
-      $this->nodes = array($document->create($name, $value, $attributes));
+      $this->nodes = array(
+        $this->document->create($name, $value, $attributes)
+      );
     }
     elseif ($name instanceof DOMNode) {
-      $this->nodes = array($name);
+      $this->nodes = array(
+        $name
+      );
     }
     elseif ($name instanceof DOMNodeList) {
       foreach ($name as $node) {
@@ -38,5 +43,324 @@ class Node implements Interfaces\Node {
     elseif ($name instanceof Node) {
       $this->nodes = $name->nodes;
     }
+    $this->position = 0;
+  }
+
+  public function __clone() {
+    foreach ($this->nodes as &$node) {
+      $node = $node->cloneNode(true);
+    }
+  }
+
+  public function __call($method, $args = array()) {
+    switch ($method) {
+    /**
+     * Create a deep copy of the set of matched elements.
+     */
+    case 'clone':
+      return clone $this;
+    /**
+     * Remove all child nodes of the set of matched elements from the DOM.
+     */
+    case 'empty':
+      foreach ($this->nodes as $node) {
+        foreach ($node->childNodes as $child) {
+          $node->removeChild($child);
+        }
+      }
+    }
+  }
+  
+  public function current() {
+    return new Node($this->document, $this->nodes[$this->position]);
+  }
+
+  public function key() {
+    return $this->position;
+  }
+
+  public function next() {
+    ++$this->position;
+  }
+
+  public function rewind() {
+    $this->position = 0;
+  }
+
+  public function valid() {
+    return isset($this->nodes[$this->position]);
+  }
+
+  public function count() {
+    return count($this->nodes);
+  }
+
+  /**
+   * Insert content, specified by the parameter, after each element in the set
+   * of matched elements.
+   */
+  public function after($content) {
+    if (!($content instanceof Node)) {
+      $args = func_get_args();
+      array_unshift($args, $this->document);
+      $content = call_user_func_array(array(
+          $this, '__construct'
+      ), $args);
+      var_dump($content);
+    }
+    foreach ($this->nodes as $i => $node) {
+      foreach ($content->nodes as $n) {
+        if ($i) {
+          $n = $n->cloneNode(true);
+        }
+        $node->parentNode->insertBefore($n, $node->nextSibling);
+      }
+    }
+  }
+
+  /**
+   * Insert content, specified by the parameter, to the end of each element in
+   * the set of matched elements.
+   */
+  public function append($content) {
+    if (!($content instanceof Node)) {
+      $args = func_get_args();
+      array_unshift($args, $this->document);
+      $content = call_user_func_array(array(
+          $this, '__construct'
+      ), $args);
+    }
+    foreach ($this->nodes as $i => $node) {
+      var_dump($content->nodes);
+      foreach ($content->nodes as $n) {
+        if ($i) {
+          $n = $n->cloneNode(true);
+        }
+        $node->appendChild($n);
+      }
+    }
+  }
+
+  /**
+   * Insert every element in the set of matched elements to the end of the
+   * target.
+   */
+  public function appendTo($target) {
+    foreach ($this->nodes as $node) {
+      $target->node->appendChild($node);
+    }
+  }
+
+  /**
+   * Get the value of an attribute for the first element in the set of matched
+   * elements or set one or more attributes for every matched element.
+   */
+  public function attr($attributes) {
+    $args = func_get_args();
+    if (is_array($attributes)) {
+      foreach ($attributes as $attribute => $value) {
+        foreach ($this->nodes as $node) {
+          $node->setAttributes($attribute, $value);
+        }
+      }
+    }
+    elseif (!isset($args[1])) {
+      return $this->nodes[0]->getAttribute($attributes);
+    }
+    foreach ($this->nodes as $node) {
+      $node->setAttribute($attributes, $args[1]);
+    }
+  }
+
+  /**
+   * Insert content, specified by the parameter, before each element in the set
+   * of matched elements.
+   */
+  public function before($content) {
+    if (!($content instanceof Node)) {
+      $args = func_get_args();
+      array_unshift($args, $this->document);
+      $content = call_user_func_array(array(
+          $this, '__construct'
+      ), $args);
+    }
+    foreach ($this->nodes as $i => $node) {
+      foreach ($content->nodes as $n) {
+        if ($i) {
+          $n = $n->cloneNode(true);
+        }
+        $node->parentNode->insertBefore($n, $node);
+      }
+    }
+  }
+
+  /**
+   * Remove the set of matched elements from the DOM.
+   */
+  public function detach() {
+    foreach ($this->nodes as $node) {
+      $node->parentNode->removeChild($node);
+    }
+  }
+
+  /**
+   * Insert every element in the set of matched elements after the target.
+   */
+  public function insertAfter($target) {
+    foreach ($this->nodes as $node) {
+      $target->ownerDocument->insertBefore($node, $target->nextSibling);
+    }
+  }
+
+  /**
+   * Insert every element in the set of matched elements before the target.
+   */
+  public function insertBefore($target) {
+    foreach ($this->nodes as $node) {
+      $target->ownerDocument->insertBefore($node, $target);
+    }
+  }
+
+  /**
+   * Insert content, specified by the parameter, to the beginning of each
+   * element in the set of matched elements.
+   */
+  public function prepend($content) {
+    if (!($content instanceof Node)) {
+      $args = func_get_args();
+      array_unshift($args, $this->document);
+      $content = call_user_func_array(array(
+          $this, '__construct'
+      ), $args);
+    }
+    foreach ($this->nodes as $i => $node) {
+      foreach ($content->nodes as $n) {
+        if ($i) {
+          $n = $n->cloneNode(true);
+        }
+        $node->insertBefore($n, $node->firstChild);
+      }
+    }
+  }
+
+  /**
+   * Insert every element in the set of matched elements to the beginning of the
+   * target.
+   */
+  public function prependTo($target) {
+    foreach ($this->nodes as $node) {
+      $target->insertBefore($node, $target->firstChild);
+    }
+  }
+
+  /**
+   * Get the value of a property for the first element in the set of matched
+   * elements or set one or more properties for every matched element.
+   */
+  public function prop($properties) {
+    return call_user_func_array(array($this, 'attr'), func_get_args());
+  }
+
+  /**
+   * Remove the set of matched elements from the DOM.
+   */
+  public function remove() {
+    $this->detach();
+  }
+
+  /**
+   * Remove an attribute from each element in the set of matched elements.
+   */
+  public function removeAttr($attribute) {
+    foreach ($this->nodes as $node) {
+      $node->removeAttribute($attribute);
+    }
+  }
+
+  /**
+   * Remove a property for the set of matched elements.
+   */
+  public function removeProp($property) {
+    $this->removeAttr($property);
+  }
+
+  /**
+   * Replace each target element with the set of matched elements.
+   */
+  public function replaceAll(Interfaces\Node $targets) {
+    // TODO replaceAll
+  }
+
+  /**
+   * Replace each element in the set of matched elements with the provided new
+   * content and return the set of elements that was removed.
+   */
+  public function replaceWith() {
+    // TODO replaceWith
+  }
+
+  /**
+   * Get the combined text contents of each element in the set of matched
+   * elements, including their descendants, or set the text contents of the
+   * matched elements.
+   */
+  public function text() {
+    $text = func_get_args();
+    if (empty($text)) {
+      $text = '';
+      foreach ($this->nodes as $node) {
+        $text .= $node->textContent;
+      }
+      return $text;
+    }
+    foreach ($this->nodes as $node) {
+      $node->appendChild(new DOMText(array_shift($text)));
+    }
+  }
+
+  /**
+   * Remove the parents of the set of matched elements from the DOM, leaving the
+   * matched elements in their place.
+   */
+  public function unwrap() {
+    // TODO unwrap
+    return;
+  }
+
+  /**
+   * Get the current value of the first element in the set of matched elements
+   * or set the value of every matched element.
+   */
+  public function val() {
+    $args = func_get_args();
+    if (empty($args)) {
+      return $this->nodes[0]->textValue;
+    }
+    $this->text(array_shift($args));
+  }
+
+  /**
+   * Wrap an HTML structure around each element in the set of matched elements.
+   */
+  public function wrap() {
+    // TODO wrap
+    return;
+  }
+
+  /**
+   * Wrap an HTML structure around all elements in the set of matched elements.
+   */
+  public function wrapAll() {
+    // TODO wrapAll
+    return;
+  }
+
+  /**
+   * Wrap an HTML structure around the content of each element in the set of
+   * matched elements.
+   */
+  public function wrapInner() {
+    // TODO wrapInner
+    return;
   }
 }

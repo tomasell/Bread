@@ -22,38 +22,38 @@ interface Node extends Iterator, Countable {
    * Insert content, specified by the parameter, after each element in the set
    * of matched elements.
    */
-  public function after();
+  public function after($content);
 
   /**
    * Insert content, specified by the parameter, to the end of each element in
    * the set of matched elements.
    */
-  public function append();
+  public function append($content);
 
   /**
    * Insert every element in the set of matched elements to the end of the
    * target.
    */
-  public function appendTo();
+  public function appendTo($target);
 
   /**
    * Get the value of an attribute for the first element in the set of matched
    * elements or set one or more attributes for every matched element.
    */
-  public function attr();
+  public function attr($attributes);
 
   /**
    * Insert content, specified by the parameter, before each element in the set
    * of matched elements.
    */
-  public function before();
+  public function before($content);
 
   /**
    * Create a deep copy of the set of matched elements.
    *
    * TODO Implement clone() in __call() and __clone()
    */
-  //public function clone();
+  public function __clone();
 
   /**
    * Remove the set of matched elements from the DOM.
@@ -65,35 +65,35 @@ interface Node extends Iterator, Countable {
    *
    * TODO Implement empty() in __call()
    */
-  //public function empty();
+  public function __call($method, $arguments);
 
   /**
    * Insert every element in the set of matched elements after the target.
    */
-  public function insertAfter();
+  public function insertAfter($target);
 
   /**
    * Insert every element in the set of matched elements before the target.
    */
-  public function insertBefore();
+  public function insertBefore($target);
 
   /**
    * Insert content, specified by the parameter, to the beginning of each
    * element in the set of matched elements.
    */
-  public function prepend();
+  public function prepend($content);
 
   /**
    * Insert every element in the set of matched elements to the beginning of the
    * target.
    */
-  public function prependTo();
+  public function prependTo($target);
 
   /**
    * Get the value of a property for the first element in the set of matched
    * elements or set one or more properties for every matched element.
    */
-  public function prop();
+  public function prop($properties);
 
   /**
    * Remove the set of matched elements from the DOM.
@@ -103,17 +103,17 @@ interface Node extends Iterator, Countable {
   /**
    * Remove an attribute from each element in the set of matched elements.
    */
-  public function removeAttr();
+  public function removeAttr($attribute);
 
   /**
    * Remove a property for the set of matched elements.
    */
-  public function removeProp();
+  public function removeProp($property);
 
   /**
    * Replace each target element with the set of matched elements.
    */
-  public function replaceAll();
+  public function replaceAll(Node $targets);
 
   /**
    * Replace each element in the set of matched elements with the provided new

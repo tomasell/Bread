@@ -16,11 +16,13 @@
 namespace Bread\Model\Database\Driver;
 
 use Bread;
-use Bread\Model\Database\Interfaces;
+use Bread\Model;
+use Bread\Promise;
 use DateTime;
+
 use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
 
-class MongoDB implements Interfaces\Driver {
+class MongoDB implements Model\Interfaces\Database {
   protected $client;
   protected $link;
 
@@ -48,19 +50,20 @@ class MongoDB implements Interfaces\Driver {
 
   public function first($class, $search = array(), $options = array()) {
     $options['limit'] = 1;
-    $fetch = $this->fetch($class, $search, $options);
-    return array_shift($fetch);
+    return $this->fetch($class, $search, $options)->then(function($fetch) {
+      return Promise\When::resolve(array_shift($fetch));
+    });
   }
 
   public function fetch($class, $search = array(), $options = array()) {
     $models = array();
     $documents = $this->cursor($class, $search, $options);
     foreach ($documents as $document) {
-      $this->normalizeDocument($class, $document);
-      //$model = new $class($document);
-      $models[] = $document;//$model;
+      $this->normalizeDocument($document);
+      $model = new $class($document);
+      $models[] = $model;
     }
-    return $models;
+    return Promise\When::resolve($models);
   }
 
   protected function cursor($class, $search = array(), $options = array()) {
@@ -88,37 +91,32 @@ class MongoDB implements Interfaces\Driver {
     return str_replace('.', NS, $collection);
   }
 
-  protected function normalizeDocument($class, &$document) {
-    foreach ($document as $attribute => &$value) {
-      if ($value instanceof MongoId) {
-        $value = (string) $value;
+  protected function normalizeDocument(&$document) {
+    foreach ($document as &$field) {
+      if ($field instanceof MongoId) {
+        $field = (string) $field;
       }
-      elseif ($value instanceof MongoDate) {
-        $value = new DateTime('@' . $value->sec);
+      elseif ($field instanceof MongoDate) {
+        $field = new DateTime('@' . $field->sec);
       }
-      elseif ($value instanceof MongoBinData) {
-        $value = (string) $value;
+      elseif ($field instanceof MongoBinData) {
+        $field = (string) $field;
       }
-      elseif (MongoDBRef::isRef($value)) {
-        $this->normalizeReference($value);
+      elseif (MongoDBRef::isRef($field)) {
+        $field = MongoDBRef::get($this->link, $field);
+        $this->normalizeDocument($field);
       }
-      elseif (is_array($value)) {
-        $this->normalizeDocument($class, $value);
+      elseif (Model\Database\Reference::is($field)) {
+        Model\Database\Reference::fetch($field)->then(function($model) use ($field) {
+          $field = $model;
+        });
+      }
+      elseif (is_array($field)) {
+        $this->normalizeDocument($field);
+        if ((bool) count(array_filter(array_keys($field), 'is_string'))) {
+          $field = (object) $field;
+        }
       }
     }
-  }
-
-  protected function normalizeReference(&$reference) {
-    $document = MongoDBRef::get($this->link, $reference);
-    $class = $this->className($reference['$ref']);
-    $reference = $class::first($document);
-  }
-
-  protected function denormalizeReference(&$model) {
-    $class = get_class($model);
-    if (!$first = $this->first($class, $model->attributes())) {
-      $first = $this->store($model);
-    }
-    MongoDBRef::create($this->collection($class), new MongoId($first->_id));
   }
 }

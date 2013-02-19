@@ -23,6 +23,7 @@ abstract class Model implements JsonSerializable {
     'database' => 'mongodb://localhost/test'
   );
 
+  protected static $cache;
   protected static $database;
 
   public function __construct($attributes = array()) {
@@ -68,6 +69,7 @@ abstract class Model implements JsonSerializable {
   }
 
   public static function configure($configuration = array()) {
+    static::$cache = Cache\Factory::create();
     static::$database = Model\Database\Factory::create(static::$configuration['database']);
   }
 
@@ -76,16 +78,15 @@ abstract class Model implements JsonSerializable {
   }
 
   public static function first($search = array(), $options = array()) {
-    array_multisort($search, $options);
     $key = get_called_class() . md5(json_encode($search + $options));
-    return static::$cache->get($key)->then(null, function ($key) use ($search,
-      $options) {
+    //return static::$cache->get($key)->then(null, function ($key) use ($search,
+    //  $options) {
       return static::$database->first(get_called_class(), $search, $options)->then(function (
         $result) use ($key) {
         static::$cache->set($key, $result);
         return $result;
       });
-    });
+    //});
   }
 
   public static function fetch($search = array(), $options = array()) {

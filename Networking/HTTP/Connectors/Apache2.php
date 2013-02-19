@@ -57,7 +57,7 @@ class Apache2 extends Event\Emitter implements HTTP\Interfaces\Server {
     $request->on('resume', function () use ($connection) {
       $connection->emit('resume');
     });
-    $response = new Response($request);
+    $response = new Response($connection);
     $response->once('headers', function($response) {
       foreach (apache_response_headers() as $name => $value) {
         header_remove($name);

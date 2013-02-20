@@ -292,9 +292,11 @@ class Node implements Interfaces\Node {
       }
       return $text;
     }
+    $this->empty();
     foreach ($this->nodes as $node) {
       $node->appendChild(new DOMText(array_shift($text)));
     }
+    return $this;
   }
 
   /**

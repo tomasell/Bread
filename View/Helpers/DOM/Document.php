@@ -48,6 +48,12 @@ class Document {
     return $this->save();
   }
 
+  public function load($filename, $options = 0) {
+    $this->document->load($filename, $options);
+    $this->xpath = new DOMXPath($this->document);
+    $this->root = new Node($this, $this->document->documentElement);
+  }
+  
   public function create($name, $value = null, $attributes = array()) {
     $classes = explode('.', $name);
     $name = array_shift($classes);

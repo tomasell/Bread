@@ -13,12 +13,12 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\View\Helpers;
+namespace Bread\View\Helpers\HTML;
 
-use Bread\View\Helpers\HTML;
+use Bread\View\Helpers\DOM;
 
-class HTML extends DOM\Node implements HTML\Interfaces\Node {
-  public function __construct(HTML\Page $page, $name) {
+class Node extends DOM\Node implements Interfaces\Node {
+  public function __construct(Page $page, $name) {
     parent::__construct($page, $name);
   }
 
@@ -82,11 +82,11 @@ class HTML extends DOM\Node implements HTML\Interfaces\Node {
 
   protected function getClasses($node) {
     $classes = $node->getAttribute('class');
-    return explode(' ', $classes);
+    return $classes ? explode(' ', $classes) : array();
   }
 
   protected function setClasses($node, $array) {
-    $class = implode(' ', $array);
+    $class = implode(' ', array_unique($array));
     $node->setAttribute('class', $class);
   }
 }

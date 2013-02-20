@@ -16,17 +16,36 @@
 namespace Bread\View\Helpers\HTML;
 
 use Bread\View\Helpers\DOM;
+use DOMXPath;
 
 class Page extends DOM\Document {
-  public function __construct() {
+  public function __construct($html = null) {
     parent::__construct('html');
-    $this->head = $this->root->append('<head></head>');
-    $this->charset = $this->head->append('<meta/>');
-    $this->charset->attr('charset', 'utf-8');
-    $this->title = $this->head->append('<title/>');
-    $this->body = $this->root->append('<body/>');
+    if ($html) {
+      $this->load($html);
+    }
+    else {
+      $this->root = new Node($this, $this->root);
+      $this->head = $this->root->append('<head></head>');
+      $this->charset = $this->head->append('<meta charset="utf-8"/>');
+      $this->title = $this->head->append('<title></title>');
+      $this->body = $this->root->append('<body></body>');
+    }
+  }
+  
+  public function __invoke($name) {
+    return new Node($this, parent::__invoke($name));
   }
 
+  public function load($filename) {
+    libxml_use_internal_errors(true);
+    $this->document->loadHTMLFile($filename);
+    $this->xpath = new DOMXPath($this->document);
+    $this->root = new Node($this, $this->document->documentElement);
+    libxml_clear_errors();
+    libxml_use_internal_errors(false);
+  }
+  
   public function save($node = null, $options = LIBXML_NOXMLDECL) {
     return $this->document->saveHTML($node);
     return parent::save($node, $options);

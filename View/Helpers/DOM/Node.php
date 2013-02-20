@@ -111,6 +111,7 @@ class Node implements Interfaces\Node {
         $node->parentNode->insertBefore($n, $node->nextSibling);
       }
     }
+    return $this;
   }
 
   /**
@@ -140,6 +141,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $target->node->appendChild($node);
     }
+    return $this;
   }
 
   /**
@@ -157,6 +159,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $node->setAttribute($attributes, $args[1]);
     }
+    return $this;
   }
 
   /**
@@ -175,6 +178,7 @@ class Node implements Interfaces\Node {
         $node->parentNode->insertBefore($n, $node);
       }
     }
+    return $this;
   }
 
   /**
@@ -184,6 +188,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $node->parentNode->removeChild($node);
     }
+    return $this;
   }
 
   /**
@@ -193,6 +198,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $target->ownerDocument->insertBefore($node, $target->nextSibling);
     }
+    return $this;
   }
 
   /**
@@ -202,6 +208,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $target->ownerDocument->insertBefore($node, $target);
     }
+    return $this;
   }
 
   /**
@@ -220,6 +227,7 @@ class Node implements Interfaces\Node {
         $node->insertBefore($n, $node->firstChild);
       }
     }
+    return $content;
   }
 
   /**
@@ -230,6 +238,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $target->insertBefore($node, $target->firstChild);
     }
+    return $this;
   }
 
   /**
@@ -244,7 +253,7 @@ class Node implements Interfaces\Node {
    * Remove the set of matched elements from the DOM.
    */
   public function remove() {
-    $this->detach();
+    return $this->detach();
   }
 
   /**
@@ -254,6 +263,7 @@ class Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $node->removeAttribute($attribute);
     }
+    return $this;
   }
 
   /**
@@ -261,6 +271,7 @@ class Node implements Interfaces\Node {
    */
   public function removeProp($property) {
     $this->removeAttr($property);
+    return $this;
   }
 
   /**
@@ -268,14 +279,16 @@ class Node implements Interfaces\Node {
    */
   public function replaceAll(Interfaces\Node $targets) {
     // TODO replaceAll
+    return $this;
   }
 
   /**
    * Replace each element in the set of matched elements with the provided new
    * content and return the set of elements that was removed.
    */
-  public function replaceWith() {
+  public function replaceWith($content) {
     // TODO replaceWith
+    return $content;
   }
 
   /**
@@ -283,7 +296,7 @@ class Node implements Interfaces\Node {
    * elements, including their descendants, or set the text contents of the
    * matched elements.
    */
-  public function text() {
+  public function text($text) {
     $text = func_get_args();
     if (empty($text)) {
       $text = '';
@@ -305,7 +318,7 @@ class Node implements Interfaces\Node {
    */
   public function unwrap() {
     // TODO unwrap
-    return;
+    return $this;
   }
 
   /**
@@ -318,6 +331,7 @@ class Node implements Interfaces\Node {
       return $this->nodes[0]->textValue;
     }
     $this->text(array_shift($args));
+    return $this;
   }
 
   /**
@@ -325,7 +339,7 @@ class Node implements Interfaces\Node {
    */
   public function wrap() {
     // TODO wrap
-    return;
+    return $this;
   }
 
   /**
@@ -333,7 +347,7 @@ class Node implements Interfaces\Node {
    */
   public function wrapAll() {
     // TODO wrapAll
-    return;
+    return $this;
   }
 
   /**
@@ -342,6 +356,6 @@ class Node implements Interfaces\Node {
    */
   public function wrapInner() {
     // TODO wrapInner
-    return;
+    return $this;
   }
 }

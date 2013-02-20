@@ -119,7 +119,7 @@ interface Node extends Iterator, Countable {
    * Replace each element in the set of matched elements with the provided new
    * content and return the set of elements that was removed.
    */
-  public function replaceWith();
+  public function replaceWith($content);
 
   /**
    * Get the combined text contents of each element in the set of matched

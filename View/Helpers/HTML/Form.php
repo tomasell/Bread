@@ -16,7 +16,5 @@
 namespace Bread\View\Helpers\HTML;
 
 class Form extends Node {
-  public function __construct(Page $page) {
-    parent::__construct($page, 'form');
-  }
+  
 }

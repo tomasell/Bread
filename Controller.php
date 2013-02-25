@@ -38,6 +38,7 @@ abstract class Controller {
       $this->data->progress($data);
     })->body->on('end', function($data) {
       $this->data->resolve($this->request->body->contents());
+      $this->resolver->resolve();
     });
   }
 }

@@ -20,7 +20,9 @@ use JsonSerializable;
 
 abstract class Model implements JsonSerializable {
   protected static $configuration = array(
-    'database' => 'mongodb://localhost/test'
+    'database' => array(
+      'url' => 'mongodb://localhost/test'
+    )
   );
 
   protected static $cache;
@@ -81,11 +83,11 @@ abstract class Model implements JsonSerializable {
     $key = get_called_class() . md5(json_encode($search + $options));
     //return static::$cache->get($key)->then(null, function ($key) use ($search,
     //  $options) {
-      return static::$database->first(get_called_class(), $search, $options)->then(function (
-        $result) use ($key) {
-        static::$cache->set($key, $result);
-        return $result;
-      });
+    return static::$database->first(get_called_class(), $search, $options)->then(function (
+      $result) use ($key) {
+      static::$cache->set($key, $result);
+      return $result;
+    });
     //});
   }
 

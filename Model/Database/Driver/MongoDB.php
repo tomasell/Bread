@@ -35,6 +35,7 @@ class MongoDB implements Interfaces\Database {
 
   public function store(Bread\Model $model) {
     $collection = $this->collection(get_class($model));
+    $this->denormalizeDocument($model);
     $this->link->$collection->save($model);
     return $model;
   }
@@ -69,9 +70,7 @@ class MongoDB implements Interfaces\Database {
 
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
-    $search = $this->normalizeSearch(array(
-      $search
-    ))[0];
+    $this->normalizeSearch($search);
     $cursor = $this->link->$collection->find($search);
     foreach ($options as $key => $option) {
       switch ($key) {
@@ -86,43 +85,8 @@ class MongoDB implements Interfaces\Database {
     return $cursor;
   }
 
-  protected function normalizeSearch($search) {
-    foreach ($search as &$conditions) {
-      foreach ($conditions as $attribute => &$condition) {
-        switch ($attribute) {
-        case '$and':
-        case '$or':
-        case '$nor':
-          $condition = $this->normalizeSearch($condition);
-          continue 2;
-        default:
-          if (is_array($condition)) {
-            $c = array();
-            foreach ($condition as $k => &$v) {
-              switch ($k) {
-              case '$in':
-              case '$nin':
-              case '$all':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
-                continue 2;
-              case '$not':
-                $v = $this->normalizeSearch(array(
-                  $v
-                ))[0];
-                continue 2;
-              }
-              $this->formatValue($v);
-            }
-          }
-          else {
-            $this->formatValue($condition);
-          }
-        }
-      }
-    }
-    return $search;
+  protected function normalizeSearch(&$search) {
+    array_walk_recursive($search, array($this, 'formatValue'));
   }
 
   protected function formatValue(&$value) {
@@ -132,19 +96,16 @@ class MongoDB implements Interfaces\Database {
     elseif ($value instanceof DateTime) {
       $value = new MongoDate($value->format('U'));
     }
-    elseif (is_array($value)) {
-      foreach ($value as &$v) {
-        $this->formatValue($v);
-      }
-    }
   }
 
   protected function collection($class) {
     $class = is_object($class) ? get_class($class) : $class;
+    return $class;
     return str_replace(NS, '.', $class);
   }
 
   protected function className($collection) {
+    return $collection;
     return str_replace('.', NS, $collection);
   }
 
@@ -176,5 +137,9 @@ class MongoDB implements Interfaces\Database {
         }
       }
     }
+  }
+  
+  protected function denormalizeDocument(&$document) {
+    ;
   }
 }

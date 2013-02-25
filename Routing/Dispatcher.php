@@ -36,8 +36,10 @@ class Dispatcher {
       if (!is_callable($callback)) {
         return Promise\When::reject(new Exceptions\NotFound($request->uri));
       }
-      return call_user_func_array($callback, $arguments);
-    })->then(null, function (Exception $exception) use ($response) {
+      return Promise\When::resolve(call_user_func_array($callback, $arguments));
+    })->then(function ($output) use ($response) {
+      $response->end($output);
+    }, function (Exception $exception) use ($response) {
       $response->status($exception->getCode());
       $response->end($exception->getMessage());
     });

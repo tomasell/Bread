@@ -19,6 +19,7 @@ use Bread\Event;
 use Bread\Stream;
 use Bread\Networking;
 
+// TODO Extend Stream\Composite or Stream\Through
 class Connection extends Stream implements Networking\Interfaces\Connection {
   use Stream\Traits\Pipe;
 

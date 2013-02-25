@@ -34,14 +34,14 @@ class Document {
     $this->root = new Node($this, $this->document->documentElement);
   }
 
-  public function __invoke($name) {
+  public function __invoke($name, $context = null) {
     if (preg_match('/^</', $name)) {
       $fragment = $this->document->createDocumentFragment();
       $fragment->appendXML($name);
       $node = $fragment->removeChild($fragment->firstChild);
       return new Node($this, $node);
     }
-    return new Node($this, $this->selector($name));
+    return new Node($this, $this->selector($name, $context));
   }
 
   public function __toString() {
@@ -55,32 +55,11 @@ class Document {
   }
   
   public function create($name, $value = null, $attributes = array()) {
-    $classes = explode('.', $name);
-    $name = array_shift($classes);
-    if (is_array($value)) {
-      $attributes = $value;
-      $value = null;
-    }
-    if (!empty($classes)) {
-      if (isset($attributes['class'])) {
-        $classes[] = $attributes['class'];
-      }
-      $attributes = array_merge($attributes, array(
-        'class' => implode(" ", array_unique($classes))
-      ));
-    }
-    list($name, $id) = explode('#', $name)
-      + array(
-        null, null
-      );
-    if ($id) {
-      $attributes['id'] = $id;
-    }
     $element = $this->document->createElement($name);
     foreach ($attributes as $name => $value) {
       $element->setAttribute($name, $value);
     }
-    return $element;
+    return new Node($this, $element);
   }
 
   public function save($node = null, $options = 0) {
@@ -88,8 +67,15 @@ class Document {
   }
 
   // TODO move selector to HTML (because it assumes #id and .class)
-  protected function selector($selector) {
+  protected function selector($selector, $context = null) {
+    $context = $context ? : $this->root;
     $xpath = Selector::toXPath($selector);
-    return $this->xpath->query($xpath);
+    $nodes = array();
+    foreach ($context->nodes as $node) {
+      foreach ($this->xpath->query($xpath, $node) as $n) {
+        $nodes[] = $n;
+      }
+    }
+    return $nodes;
   }
 }

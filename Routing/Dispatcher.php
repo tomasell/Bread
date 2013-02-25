@@ -27,7 +27,7 @@ class Dispatcher {
     $router->route($request)->then(function ($result) use ($request, $response) {
       list($Controller, $action, $arguments) = $result;
       if (!is_subclass_of($Controller, 'Bread\Controller')) {
-        return Promise\When::reject(new Exceptions\NotFound($request->uris));
+        return Promise\When::reject(new Exceptions\NotFound($request->uri));
       }
       $controller = new $Controller($request, $response);
       $callback = array(

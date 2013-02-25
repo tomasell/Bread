@@ -70,7 +70,7 @@ abstract class Model implements JsonSerializable {
 
   public static function configure($configuration = array()) {
     static::$cache = Cache\Factory::create();
-    static::$database = Model\Database\Factory::create(static::$configuration['database']);
+    static::$database = Model\Database\Factory::create(static::$configuration['database']['url']);
   }
 
   public static function count($search = array(), $options = array()) {

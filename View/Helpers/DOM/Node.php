@@ -18,17 +18,15 @@ namespace Bread\View\Helpers\DOM;
 use DOMNodeList, DOMNode, DOMText;
 
 class Node implements Interfaces\Node {
-  protected $position;
+  public $nodes = array();
   protected $document;
-  protected $nodes = array();
+  protected $position;
 
   public function __construct(Document $document, $name, $value = null,
     $attributes = array()) {
     $this->document = $document;
     if (is_string($name)) {
-      $this->nodes = array(
-        $this->document->create($name, $value, $attributes)
-      );
+      $this->nodes = $this->document->create($name, $value, $attributes)->nodes;
     }
     elseif ($name instanceof DOMNode) {
       $this->nodes = array(
@@ -42,6 +40,9 @@ class Node implements Interfaces\Node {
     }
     elseif ($name instanceof Node) {
       $this->nodes = $name->nodes;
+    }
+    elseif (is_array($name)) {
+      $this->nodes = $name;
     }
     $this->position = 0;
   }
@@ -71,8 +72,12 @@ class Node implements Interfaces\Node {
     }
   }
 
+  public function __invoke($name) {
+    return $this->document->__invoke($name, $this);
+  }
+
   public function current() {
-    return new Node($this->document, $this->nodes[$this->position]);
+    return new static($this->document, $this->nodes[$this->position]);
   }
 
   public function key() {
@@ -101,7 +106,9 @@ class Node implements Interfaces\Node {
    */
   public function after($content) {
     if (!($content instanceof Node)) {
-      $content = $this->document->__invoke($content);
+      $content = call_user_func_array(array(
+        $this->document, 'create'
+      ), func_get_args());
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -120,7 +127,9 @@ class Node implements Interfaces\Node {
    */
   public function append($content) {
     if (!($content instanceof Node)) {
-      $content = $this->document->__invoke($content);
+      $content = call_user_func_array(array(
+        $this->document, 'create'
+      ), func_get_args());
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -138,8 +147,10 @@ class Node implements Interfaces\Node {
    * target.
    */
   public function appendTo($target) {
-    foreach ($this->nodes as $node) {
-      $target->node->appendChild($node);
+    foreach ($target->nodes as $t) {
+      foreach ($this->nodes as $node) {
+        $t->appendChild($node);
+      }
     }
     return $this;
   }
@@ -150,14 +161,26 @@ class Node implements Interfaces\Node {
    */
   public function attr($attributes) {
     $args = func_get_args();
-    if (is_array($attributes)) {
-      $content = $this->document->__invoke($content);
-    }
-    elseif (!isset($args[1])) {
+    if (!is_array($attributes) && !isset($args[1])) {
       return $this->nodes[0]->getAttribute($attributes);
     }
+    if (!is_array($attributes)) {
+      $attributes = array(
+        $args[0] => $args[1]
+      );
+    }
     foreach ($this->nodes as $node) {
-      $node->setAttribute($attributes, $args[1]);
+      foreach ($attributes as $attribute => $value) {
+        if (false === $value) {
+          $node->removeAttribute($attribute);
+        }
+        else {
+          if (true === $value) {
+            $value = $attribute;
+          }
+          $node->setAttribute($attribute, $value);
+        }
+      }
     }
     return $this;
   }
@@ -168,7 +191,9 @@ class Node implements Interfaces\Node {
    */
   public function before($content) {
     if (!($content instanceof Node)) {
-      $content = $this->document->__invoke($content);
+      $content = call_user_func_array(array(
+        $this->document, 'create'
+      ), func_get_args());
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -195,8 +220,10 @@ class Node implements Interfaces\Node {
    * Insert every element in the set of matched elements after the target.
    */
   public function insertAfter($target) {
-    foreach ($this->nodes as $node) {
-      $target->ownerDocument->insertBefore($node, $target->nextSibling);
+    foreach ($target->nodes as $t) {
+      foreach ($this->nodes as $node) {
+        $t->ownerDocument->insertBefore($node, $t->nextSibling);
+      }
     }
     return $this;
   }
@@ -205,8 +232,10 @@ class Node implements Interfaces\Node {
    * Insert every element in the set of matched elements before the target.
    */
   public function insertBefore($target) {
-    foreach ($this->nodes as $node) {
-      $target->ownerDocument->insertBefore($node, $target);
+    foreach ($target->nodes as $t) {
+      foreach ($this->nodes as $node) {
+        $t->ownerDocument->insertBefore($node, $t);
+      }
     }
     return $this;
   }
@@ -217,7 +246,9 @@ class Node implements Interfaces\Node {
    */
   public function prepend($content) {
     if (!($content instanceof Node)) {
-      $content = $this->document->__invoke($content);
+      $content = call_user_func_array(array(
+        $this->document, 'create'
+      ), func_get_args());
     }
     foreach ($this->nodes as $i => $node) {
       foreach ($content->nodes as $n) {
@@ -235,8 +266,10 @@ class Node implements Interfaces\Node {
    * target.
    */
   public function prependTo($target) {
-    foreach ($this->nodes as $node) {
-      $target->insertBefore($node, $target->firstChild);
+    foreach ($target->nodes as $t) {
+      foreach ($this->nodes as $i => $node) {
+        $t->insertBefore($node, $t->firstChild);
+      }
     }
     return $this;
   }
@@ -246,7 +279,9 @@ class Node implements Interfaces\Node {
    * elements or set one or more properties for every matched element.
    */
   public function prop($properties) {
-    return call_user_func_array(array($this, 'attr'), func_get_args());
+    return call_user_func_array(array(
+      $this, 'attr'
+    ), func_get_args());
   }
 
   /**

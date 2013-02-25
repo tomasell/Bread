@@ -15,12 +15,12 @@
 
 namespace Bread\Model\Database\Driver;
 
-use Bread\Model\Database\Interfaces;
+use Bread\Model\Interfaces;
 use Bread\Networking\HTTP;
 use Bread;
 use DateTime;
 
-class CouchDB implements Interfaces\Driver {
+class CouchDB implements Interfaces\Database {
   protected $client;
   protected $url;
 
@@ -42,7 +42,9 @@ class CouchDB implements Interfaces\Driver {
   }
 
   public function first($class, $search = array(), $options = array()) {
-    $this->design($class)->then(array($this, 'view'));
+    $this->design($class)->then(array(
+      $this, 'view'
+    ));
   }
 
   public function fetch($class, $search = array(), $options = array()) {
@@ -50,7 +52,8 @@ class CouchDB implements Interfaces\Driver {
 
   protected function design($class) {
     $name = md5($class);
-    return $this->client->get("/_design/{$name}")->then(null, function() use ($name) {
+    return $this->client->get("/_design/{$name}")->then(null, function () use (
+      $name) {
       $design = new Design\Document\Model($name);
       return $this->store($design);
     });

@@ -19,6 +19,8 @@ use Bread\View\Helpers\DOM;
 use DOMXPath;
 
 class Page extends DOM\Document {
+  protected $composed = false;
+  
   public function __construct($html = null) {
     parent::__construct('html');
     if ($html) {
@@ -37,6 +39,35 @@ class Page extends DOM\Document {
     return new Node($this, parent::__invoke($name));
   }
 
+  public function create($name, $value = null, $attributes = array()) {
+    $classes = explode('.', $name);
+    $name = array_shift($classes);
+    if (is_array($value)) {
+      $attributes = $value;
+      $value = null;
+    }
+    if (!empty($classes)) {
+      if (isset($attributes['class'])) {
+        $classes[] = $attributes['class'];
+      }
+      $attributes = array_merge($attributes, array(
+          'class' => implode(" ", array_unique($classes))
+      ));
+    }
+    list($name, $id) = explode('#', $name)
+    + array(
+        null, null
+    );
+    if ($id) {
+      $attributes['id'] = $id;
+    }
+    $element = $this->document->createElement($name, $value);
+    foreach ($attributes as $name => $value) {
+      $element->setAttribute($name, $value);
+    }
+    return new Node($this, $element);
+  }
+  
   public function load($filename) {
     libxml_use_internal_errors(true);
     $this->document->loadHTMLFile($filename);
@@ -47,7 +78,17 @@ class Page extends DOM\Document {
   }
   
   public function save($node = null, $options = LIBXML_NOXMLDECL) {
+    $this->compose();
     return $this->document->saveHTML($node);
-    return parent::save($node, $options);
+  }
+  
+  public function compose() {
+    if ($this->composed) {
+      return;
+    }
+    foreach ($this('[data-bread-block]') as $block) {
+      $name = $block->attr('data-bread-block');
+    }
+    $this->composed = true;
   }
 }

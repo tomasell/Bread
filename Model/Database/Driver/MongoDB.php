@@ -17,12 +17,13 @@ namespace Bread\Model\Database\Driver;
 
 use Bread;
 use Bread\Model;
+use Bread\Model\Interfaces;
 use Bread\Promise;
 use DateTime;
 
 use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
 
-class MongoDB implements Model\Interfaces\Database {
+class MongoDB implements Interfaces\Database {
   protected $client;
   protected $link;
 
@@ -50,7 +51,7 @@ class MongoDB implements Model\Interfaces\Database {
 
   public function first($class, $search = array(), $options = array()) {
     $options['limit'] = 1;
-    return $this->fetch($class, $search, $options)->then(function($fetch) {
+    return $this->fetch($class, $search, $options)->then(function ($fetch) {
       return Promise\When::resolve(array_shift($fetch));
     });
   }
@@ -68,6 +69,9 @@ class MongoDB implements Model\Interfaces\Database {
 
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
+    $search = $this->normalizeSearch(array(
+      $search
+    ))[0];
     $cursor = $this->link->$collection->find($search);
     foreach ($options as $key => $option) {
       switch ($key) {
@@ -80,6 +84,59 @@ class MongoDB implements Model\Interfaces\Database {
       }
     }
     return $cursor;
+  }
+
+  protected function normalizeSearch($search) {
+    foreach ($search as &$conditions) {
+      foreach ($conditions as $attribute => &$condition) {
+        switch ($attribute) {
+        case '$and':
+        case '$or':
+        case '$nor':
+          $condition = $this->normalizeSearch($condition);
+          continue 2;
+        default:
+          if (is_array($condition)) {
+            $c = array();
+            foreach ($condition as $k => &$v) {
+              switch ($k) {
+              case '$in':
+              case '$nin':
+              case '$all':
+                array_walk($v, array(
+                  $this, 'formatValue'
+                ));
+                continue 2;
+              case '$not':
+                $v = $this->normalizeSearch(array(
+                  $v
+                ))[0];
+                continue 2;
+              }
+              $this->formatValue($v);
+            }
+          }
+          else {
+            $this->formatValue($condition);
+          }
+        }
+      }
+    }
+    return $search;
+  }
+
+  protected function formatValue(&$value) {
+    if (is_subclass_of($value, 'Bread\Model')) {
+      $v = (array) new Database\Reference($value);
+    }
+    elseif ($value instanceof DateTime) {
+      $value = new MongoDate($value->format('U'));
+    }
+    elseif (is_array($value)) {
+      foreach ($value as &$v) {
+        $this->formatValue($v);
+      }
+    }
   }
 
   protected function collection($class) {
@@ -106,8 +163,9 @@ class MongoDB implements Model\Interfaces\Database {
         $field = MongoDBRef::get($this->link, $field);
         $this->normalizeDocument($field);
       }
-      elseif (Model\Database\Reference::is($field)) {
-        Model\Database\Reference::fetch($field)->then(function($model) use ($field) {
+      elseif (Database\Reference::is($field)) {
+        Database\Reference::fetch($field)->then(function ($model) use (
+          $field) {
           $field = $model;
         });
       }

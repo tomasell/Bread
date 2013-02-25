@@ -31,6 +31,7 @@ class Node extends DOM\Node implements Interfaces\Node {
       $classes[] = $class;
       $this->setClasses($node, $classes);
     }
+    return $this;
   }
 
   /**
@@ -53,6 +54,7 @@ class Node extends DOM\Node implements Interfaces\Node {
     foreach ($this->nodes as $node) {
       $this->setClasses($node, array_diff($this->getClasses($node), explode(' ', $class)));
     }
+    return $this;
   }
 
   /**
@@ -70,6 +72,7 @@ class Node extends DOM\Node implements Interfaces\Node {
         $this->addClass($class);
       }
     }
+    return $this;
   }
 
   /**

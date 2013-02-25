@@ -21,7 +21,7 @@ use Bread\Networking\HTTP\Response;
 use Bread\Event;
 
 class Apache2 extends Event\Emitter implements HTTP\Interfaces\Server {
-  private $loop;
+  public $loop;
 
   public function __construct(Event\Interfaces\Loop $loop) {
     $this->loop = $loop;

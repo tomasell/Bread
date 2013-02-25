@@ -271,6 +271,7 @@ abstract class Message extends Event\Emitter implements
     $this->startLine = $startLine;
     $this->headers = new Message\Headers($headers);
     $this->body($body);
+    $this->pipe($this->body);
   }
 
   public function __destruct() {
@@ -281,12 +282,27 @@ abstract class Message extends Event\Emitter implements
 
   public function __get($name) {
     switch ($name) {
+      case 'type':
     case 'contentType':
       return isset($this->headers['Content-Type']) ? $this->headers['Content-Type']
         : null;
+    case 'length':
     case 'contentLength':
       return isset($this->headers['Content-Length']) ? (int) $this->headers['Content-Length']
         : null;
+    }
+  }
+  
+  public function __set($name, $value) {
+    switch ($name) {
+      case 'type':
+      case 'contentType':
+        $this->headers['Content-Type'] = $value;
+        break;
+      case 'length':
+      case 'contentLength':
+        $this->headers['Content-Length'] = $value;
+        break;
     }
   }
 
@@ -311,12 +327,12 @@ abstract class Message extends Event\Emitter implements
 
   public function body($body = null) {
     if (!is_resource($body)) {
-      $this->body = fopen("data://text/plain,$body", 'r');
+      $this->body = new Stream(fopen("php://temp", 'r+'), $this->connection->loop);
+      $this->body->write($body);
     }
     else {
-      $this->body = $body;
+      $this->body = new Stream($body, $this->connection->loop);
     }
-    return $this->body;
   }
 
   public function isReadable() {
@@ -352,6 +368,9 @@ abstract class Message extends Event\Emitter implements
 
   public function end($data = null) {
     if (null !== $data) {
+      if (!isset($this->headers['Content-Length'])) {
+        $this->headers['Content-Length'] = strlen($data);
+      }
       $this->write($data);
     }
     else {
@@ -379,5 +398,13 @@ abstract class Message extends Event\Emitter implements
     $this->closed = true;
     $this->removeAllListeners();
     $this->connection->end();
+  }
+  
+  public function type($contentType) {
+    if (isset($this->mimeTypes[$contentType])) {
+      $contentType = $this->mimeTypes[$contentType];
+      $contentType = is_array($contentType) ? current($contentType) : $contentType;
+    }
+    $this->headers['Content-Type'] = $contentType;
   }
 }

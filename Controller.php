@@ -17,13 +17,27 @@ namespace Bread;
 
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
+use Bread\Promise;
 
 abstract class Controller {
   protected $request;
   protected $response;
-
+  protected $deferred;
+  protected $resolver;
+  protected $promise;
+  protected $data;
+  
   public function __construct(Request $request, Response $response) {
     $this->request = $request;
     $this->response = $response;
+    $this->deferred = new Promise\Deferred();
+    $this->resolver = $this->deferred->resolver();
+    $this->promise = $this->deferred->promise();
+    $this->data = new Promise\Deferred();
+    $this->request->on('data', function($data) {
+      $this->data->progress($data);
+    })->body->on('end', function($data) {
+      $this->data->resolve($this->request->body->contents());
+    });
   }
 }

@@ -22,12 +22,12 @@ class Stream extends Event\Emitter implements Stream\Interfaces\Readable,
   Stream\Interfaces\Writable {
   use Stream\Traits\Pipe;
 
-  public $bufferSize = 4096;
+  public $loop;
   public $stream;
   protected $readable = true;
   protected $writable = true;
   protected $closing = false;
-  protected $loop;
+  protected $bufferSize = 4096;
   protected $buffer;
 
   public function __construct($stream, Event\Interfaces\Loop $loop) {
@@ -64,6 +64,23 @@ class Stream extends Event\Emitter implements Stream\Interfaces\Readable,
     ));
   }
 
+  public function seek($offset, $whence = SEEK_SET) {
+    fseek($this->stream, $offset, $whence);
+  }
+  
+  public function tell() {
+    return ftell($this->stream);
+  }
+  
+  public function rewind() {
+    rewind($this->stream);
+  }
+  
+  public function contents($rewind = true) {
+    $rewind && $this->rewind();
+    return stream_get_contents($this->stream);
+  }
+  
   public function write($data) {
     if (!$this->writable) {
       return;

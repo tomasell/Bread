@@ -17,6 +17,7 @@ namespace Bread\Networking;
 
 use Bread\Stream;
 
+// TODO Extend Stream\Composite or Stream\Through
 class Connection extends Stream implements Interfaces\Connection {
   public function handleData($stream) {
     $data = stream_socket_recvfrom($stream, $this->bufferSize);

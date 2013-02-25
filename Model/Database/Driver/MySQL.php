@@ -15,6 +15,8 @@
 
 namespace Bread\Model\Database\Driver;
 
+use Bread\Model\Database\Reference;
+
 use Bread;
 use Bread\Model\Interfaces;
 use mysqli;
@@ -30,13 +32,10 @@ class MySQL implements Interfaces\Database {
   protected $link;
 
   public function __construct($url) {
-    $conn = array_merge(array(
-      'host' => 'localhost',
-      'port' => self::DEFAULT_PORT,
-      'user' => null,
-      'pass' => null,
-      'path' => null
-    ), parse_url($url));
+    $conn = array_merge(
+      array(
+        'host' => 'localhost', 'port' => self::DEFAULT_PORT, 'user' => null, 'pass' => null, 'path' => null
+      ), parse_url($url));
     $this->database = ltrim($conn['path'], '/');
     if (!$this->link = new mysqli($conn['host'], $conn['user'], $conn['pass'],
       $this->database, $conn['port'])) {
@@ -44,7 +43,10 @@ class MySQL implements Interfaces\Database {
     }
     $this->link->set_charset('utf8');
     while (!$this->link->select_db($this->database)) {
-      if (!$this->query("CREATE DATABASE `%s` DEFAULT CHARACTER SET 'utf8' COLLATE 'utf8_unicode_ci'", $this->database)) {
+      if (!$this
+        ->query(
+          "CREATE DATABASE `%s` DEFAULT CHARACTER SET 'utf8' COLLATE 'utf8_unicode_ci'",
+          $this->database)) {
         throw new Exception($this->link->error);
       }
     }
@@ -72,8 +74,7 @@ class MySQL implements Interfaces\Database {
     $result = $this->link->query($query);
     if (is_bool($result)) {
       $cache = $result;
-    }
-    else {
+    } else {
       while ($row = $result->fetch_assoc()) {
         $rows[] = $row;
       }
@@ -106,25 +107,27 @@ class MySQL implements Interfaces\Database {
   public function fetch($class, $search = [], $options = []) {
     $models = array();
     $where = $this->normalizeSearch($class, array(
-      $search
-    ));
+        $search
+      ));
     $table = $class::$configuration['database']['options']['table'];
     $key = $class::$configuration['database']['options']['key'];
     $query = "SELECT `$key` FROM `$table` WHERE $where GROUP BY `$key`";
     foreach ($this->query($query) as $result) {
       $condition = $result[$key];
       $this->formatValue($condition);
-      $models[] = new $class($this->_fetch($class::$attributes, $table, array(), null, null, false));
+      $models[] = new $class(
+        $this
+          ->_fetch($class::$attributes, $table,
+            array(
+              $key => $condition
+            ), $key, false));
     }
     return $models;
   }
 
-  protected function _fetch($properties, $table, $keys, $k, $v, $multiple = true,
+  protected function _fetch($properties, $table, $keys, $k, $multiple = true,
     $cast = false) {
     $attributes = array();
-    if ($k) {
-      $keys[$k] = $v;
-    }
     foreach ($keys as $field => $value) {
       $conditions[] = "`$field` = $value";
     }
@@ -132,6 +135,7 @@ class MySQL implements Interfaces\Database {
     $query = "SELECT * FROM `$table` WHERE $condition";
     var_dump($query);
     foreach ($this->query($query) as $i => $row) {
+      $key = $row[$k];
       $attributes[$i] = array();
       foreach ($properties as $attribute => $property) {
         if (!isset($property['multiple'])) {
@@ -140,28 +144,39 @@ class MySQL implements Interfaces\Database {
         $property = (object) $property;
         if (isset($row[$attribute])) {
           $attributes[$i][$attribute] = $row[$attribute];
-        }
-        elseif (is_array($property->type)) {
-          $attributes[$i][$attribute] = $this->_fetch($property->type, "{$table}_{$attribute}", $keys, substr($attribute, 0, -1), $i, $property->multiple, true);
-        }
-        elseif ($property->multiple) {
-          $attributes[$i][$attribute] = array_map(function ($value) use ($attribute) {
-            return $value[$attribute];
-          }, $this->_fetch(array(
-            $attribute => ['type' => $property->type]
-          ), "{$table}_{$attribute}", $keys, substr($attribute, 0, -1), $i, true));
-        }
-        elseif (is_subclass_of($property->type, 'Bread\Model')) {
-          $attributes[$i][$attribute] = $this->_fetch(array(
-            '$ref' => ['type' => 'text'], '$id' => ['type' => 'text']
-          ), "{$table}_{$attribute}", $keys, substr($attribute, 0, -1), $i, $property->multiple, true);
+        } elseif (is_array($property->type)) {
+          $attributes[$i][$attribute] = $this
+            ->_fetch($property->type, "{$table}_{$attribute}", $keys, $attribute,
+              $property->multiple, true);
+        } elseif ($property->multiple) {
+          $keys[$k] = $key;
+          $attributes[$i][$attribute] = array_map(
+            function ($value) use ($attribute) {
+              return $value[$attribute];
+            },
+            $this
+              ->_fetch(
+                array(
+                  $attribute => ['type' => $property->type]
+                ), "{$table}_{$attribute}", $keys, $k, true));
+        } elseif (is_subclass_of($property->type, 'Bread\Model')) {
+          $keys[$k] = $key;
+          $tmpRef = [];
+          $tmpRef[] = $this
+            ->_fetch(
+              array(
+                '$ref' => ['type' => 'text'], '$id' => ['type' => 'text']
+              ), "{$table}_{$attribute}", $keys, $k, $property->multiple, true);
+
+          $attributes[$i][$attribute] = $tmpRef[0];//Reference::fetch($tmpRef[0]);
         }
       }
     }
     if ($cast) {
-      $attributes = array_map(function ($array) {
-        return (object) $array;
-      }, $attributes);
+      $attributes = array_map(
+        function ($array) {
+          return (object) $array;
+        }, $attributes);
     }
     return $multiple ? $attributes : array_shift($attributes);
   }
@@ -198,15 +213,17 @@ class MySQL implements Interfaces\Database {
             foreach ($condition as $k => $v) {
               switch ($k) {
               case '$in':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
+                array_walk($v,
+                  array(
+                    $this, 'formatValue'
+                  ));
                 $c[] = "`$attribute` IN (" . implode(" , ", $v) . ")";
                 continue 2;
               case '$nin':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
+                array_walk($v,
+                  array(
+                    $this, 'formatValue'
+                  ));
                 $c[] = "`$attribute` NOT IN (" . implode(" , ", $v) . ")";
                 continue 2;
               case '$lt':
@@ -225,11 +242,12 @@ class MySQL implements Interfaces\Database {
                 $op = 'IS NOT';
                 break;
               case '$all':
-                $all = array_map(function ($value) use ($attribute) {
-                  return array(
-                    $attribute => $value
-                  );
-                }, $v);
+                $all = array_map(
+                  function ($value) use ($attribute) {
+                    return array(
+                      $attribute => $value
+                    );
+                  }, $v);
                 $c[] = $this->normalizeSearch($class, $all, '$or');
                 continue 2;
               case '$not':
@@ -237,9 +255,11 @@ class MySQL implements Interfaces\Database {
                   $attribute => $v
                 );
                 $c[] = "NOT "
-                  . $this->normalizeSearch($class, array(
-                    $not
-                  ));
+                  . $this
+                    ->normalizeSearch($class,
+                      array(
+                        $not
+                      ));
                 continue 2;
               }
               $this->formatValue($v, $op);
@@ -271,12 +291,10 @@ class MySQL implements Interfaces\Database {
   protected function formatValue(&$v, &$op = '=') {
     if (is_string($v)) {
       $v = "'" . $this->link->real_escape_string($v) . "'";
-    }
-    elseif (is_null($v)) {
+    } elseif (is_null($v)) {
       $op = "IS";
       $v = "NULL";
-    }
-    elseif ($v instanceof DateTime) {
+    } elseif ($v instanceof DateTime) {
       $v = $v->format(static::DATETIME_FORMAT);
     }
   }

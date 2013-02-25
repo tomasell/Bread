@@ -19,18 +19,19 @@ use Bread;
 
 class Reference {
   public $ref;
-  public $key;
+  public $id;
 
   public function __construct(Bread\Model $model) {
-    $this->ref = get_class($model);
-    $this->key = $model->key();
+    $this->{'$ref'} = get_class($model);
+    $this->{'$id'} = $model->key();
   }
 
   public static function is($array) {
     if ($array instanceof Reference) {
       return true;
     }
-    if (isset($array['ref']) && isset($array['key'])) {
+    $array = (array) $array;
+    if (isset($array['$ref']) && isset($array['$id'])) {
       return true;
     }
     return false;
@@ -40,7 +41,8 @@ class Reference {
     if (!static::is($array)) {
       throw new Bread\Exception("Not a valid reference");
     }
-    $class = $array['ref'];
-    return $class::first($array['key']);
+    $array = (array) $array;
+    $class = $array['$ref'];
+    return $class::first($array['$id']);
   }
 }

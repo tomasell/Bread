@@ -29,11 +29,14 @@ class Controller extends Bread\Controller {
   );
 
   public static function configure($configuration = array()) {
+    if (static::configured()) {
+      return static::configuration();
+    }
     parent::configure($configuration);
     if (!isset(static::$default)) {
-      if (!static::$default = Model::first(static::get('default'))) {
-        static::$default = new Model(static::get('default'));
-      }
+      Model::first(static::get('default'))->then(function ($default) {
+        static::$default = $default ? : new Model(static::get('default'));
+      });
     }
     if (!isset(static::$current)) {
       static::$current = static::$default;

@@ -22,6 +22,26 @@ class Node extends DOM\Node implements Interfaces\Node {
     parent::__construct($page, $name);
   }
 
+  public function __get($name) {
+    switch ($name) {
+    case 'id':
+      return $this->nodes[0]->getAttribute($name);
+    default:
+      return parent::__get($name);
+    }
+  }
+
+  public function __set($name, $value) {
+    switch ($name) {
+    case 'id':
+      $this->nodes[0]->setAttribute($name, $value);
+      $this->nodes[0]->setIdAttribute($name, true);
+      break;
+    default:
+      parent::__set($name, $value);
+    }
+  }
+
   /**
    * Adds the specified class(es) to each of the set of matched elements.
    */

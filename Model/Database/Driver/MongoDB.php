@@ -17,6 +17,7 @@ namespace Bread\Model\Database\Driver;
 
 use Bread;
 use Bread\Model;
+use Bread\Model\Database;
 use Bread\Model\Interfaces;
 use Bread\Promise;
 use DateTime;
@@ -33,11 +34,11 @@ class MongoDB implements Interfaces\Database {
     $this->link = $this->client->$database;
   }
 
-  public function store(Bread\Model $model) {
+  public function store(Bread\Model &$model) {
     $collection = $this->collection(get_class($model));
-    $this->denormalizeDocument($model);
-    $this->link->$collection->save($model);
-    return $model;
+    $document = $model->attributes();
+    $this->denormalizeDocument($document);
+    $this->link->$collection->save($document);
   }
 
   public function delete(Bread\Model $model) {
@@ -86,7 +87,9 @@ class MongoDB implements Interfaces\Database {
   }
 
   protected function normalizeSearch(&$search) {
-    array_walk_recursive($search, array($this, 'formatValue'));
+    array_walk_recursive($search, array(
+      $this, 'formatValue'
+    ));
   }
 
   protected function formatValue(&$value) {
@@ -101,16 +104,14 @@ class MongoDB implements Interfaces\Database {
   protected function collection($class) {
     $class = is_object($class) ? get_class($class) : $class;
     return $class;
-    return str_replace(NS, '.', $class);
   }
 
   protected function className($collection) {
     return $collection;
-    return str_replace('.', NS, $collection);
   }
 
   protected function normalizeDocument(&$document) {
-    foreach ($document as &$field) {
+    array_walk_recursive($document, function (&$field) {
       if ($field instanceof MongoId) {
         $field = (string) $field;
       }
@@ -120,26 +121,28 @@ class MongoDB implements Interfaces\Database {
       elseif ($field instanceof MongoBinData) {
         $field = (string) $field;
       }
+      elseif (Database\Reference::is($field)) {
+        Database\Reference::fetch($field)->then(function ($model) use (&$field) {
+          $field = $model;
+        });
+      }
       elseif (MongoDBRef::isRef($field)) {
         $field = MongoDBRef::get($this->link, $field);
         $this->normalizeDocument($field);
       }
-      elseif (Database\Reference::is($field)) {
-        Database\Reference::fetch($field)->then(function ($model) use (
-          $field) {
-          $field = $model;
-        });
-      }
-      elseif (is_array($field)) {
-        $this->normalizeDocument($field);
-        if ((bool) count(array_filter(array_keys($field), 'is_string'))) {
-          $field = (object) $field;
-        }
-      }
-    }
+    });
   }
-  
+
   protected function denormalizeDocument(&$document) {
-    ;
+    array_walk_recursive($document, function (&$value) {
+      if (is_subclass_of($value, 'Bread\Model')) {
+        $this->store($value);
+        $value = new Database\Reference($value);
+      }
+      elseif (is_a($value, 'Bread\Model\Attribute')) {
+        $value = $value->__toArray();
+        $this->denormalizeDocument($value);
+      }
+    });
   }
 }

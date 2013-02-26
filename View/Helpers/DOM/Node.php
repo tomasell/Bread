@@ -71,6 +71,14 @@ class Node implements Interfaces\Node {
       }
     }
   }
+  
+  public function __get($name) {
+    return $this->attr($name);
+  }
+  
+  public function __set($name, $value) {
+    $this->attr($name, $value);
+  }
 
   public function __invoke($name) {
     return $this->document->__invoke($name, $this);

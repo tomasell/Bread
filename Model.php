@@ -15,20 +15,22 @@
 
 namespace Bread;
 
+use Bread\Core;
 use Bread\Model;
 use JsonSerializable;
 
-abstract class Model implements JsonSerializable {
+abstract class Model extends Core\Dough implements JsonSerializable {
+  protected static $cache;
+  protected static $database;
+  protected static $attributes = array();
   protected static $configuration = array(
     'database' => array(
       'url' => 'mongodb://localhost/test'
     )
   );
 
-  protected static $cache;
-  protected static $database;
-
   public function __construct($attributes = array()) {
+    parent::__construct();
     foreach ($attributes as $attribute => $value) {
       $this->__set($attribute, $value);
     }
@@ -64,26 +66,36 @@ abstract class Model implements JsonSerializable {
   }
 
   public function store() {
-    static::$database->store($this);
+    static::database()->store($this);
   }
 
   protected function validate($attribute, $value) {
   }
 
   public static function configure($configuration = array()) {
-    static::$cache = Cache\Factory::create();
-    static::$database = Model\Database\Factory::create(static::$configuration['database']['url']);
+    $self = get_called_class();
+    if ($self::configured()) {
+      return $self::configuration();
+    }
+    $configuration['attributes'] = $self::$attributes;
+    $configuration = parent::configure($configuration);
+    $self::$cache = Cache\Factory::create();
+    if (!isset(self::$database[$self])) {
+      self::$database[$self] = Model\Database\Factory::create($self::get('database.url'));
+    }
+    return $configuration;
   }
 
   public static function count($search = array(), $options = array()) {
-    return static::$database->count(get_called_class(), $search, $options);
+    return static::database()->count(get_called_class(), $search, $options);
   }
 
   public static function first($search = array(), $options = array()) {
-    $key = get_called_class() . md5(json_encode($search + $options));
+    $self = get_called_class();
+    $key = $self . md5(json_encode($search + $options));
     //return static::$cache->get($key)->then(null, function ($key) use ($search,
     //  $options) {
-    return static::$database->first(get_called_class(), $search, $options)->then(function (
+    return static::database()->first(get_called_class(), $search, $options)->then(function (
       $result) use ($key) {
       static::$cache->set($key, $result);
       return $result;
@@ -92,6 +104,19 @@ abstract class Model implements JsonSerializable {
   }
 
   public static function fetch($search = array(), $options = array()) {
-    return static::$database->fetch(get_called_class(), $search, $options);
+    return static::database()->fetch(get_called_class(), $search, $options);
+  }
+  
+  public static function id() {
+    $attributes = array_keys(get_class_vars(get_called_class()));
+    return array_shift($attributes);
+  }
+  
+  protected static function database() {
+    $self = get_called_class();
+    $self::configure();
+    if (isset(self::$database[$self])) {
+      return self::$database[$self];
+    }
   }
 }

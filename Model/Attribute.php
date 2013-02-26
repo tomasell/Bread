@@ -25,8 +25,18 @@ class Attribute extends SplObjectStorage implements JsonSerializable {
   public function __toString() {
     return (string) $this->current();
   }
+
+  public function __toArray() {
+    $attribute = array();
+    foreach ($this as $key) {
+      $attribute[] = array(
+        '$key' => $key, '$val' => $this->offsetGet($key)
+      );
+    }
+    return $attribute;
+  }
   
   public function jsonSerialize() {
-    return $this->current();
+    return $this->__toArray();
   }
 }

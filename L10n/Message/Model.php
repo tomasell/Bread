@@ -20,9 +20,9 @@ use Bread\L10n\Localized;
 class Model extends Localized {
   protected $msgid;
   protected $msgstr;
-  protected $domain;
+  protected $domain = 'default';
   
   protected static $localized = array(
-    'msgstr'
+    'msgstr' => true
   );
 }

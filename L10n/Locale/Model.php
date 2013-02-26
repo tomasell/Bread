@@ -22,6 +22,6 @@ class Model extends Localized {
   protected $name;
 
   protected static $localized = array(
-    'name'
+    'name' => true
   );
 }

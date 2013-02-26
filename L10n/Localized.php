@@ -30,7 +30,7 @@ abstract class Localized extends Bread\Model {
       return $this->$attribute->offsetGet(Locale::$current);
     }
     else {
-      parent::__get($attribute, $value);
+      parent::__get($attribute);
     }
   }
   
@@ -45,5 +45,10 @@ abstract class Localized extends Bread\Model {
     else {
       parent::__set($attribute, $value);
     }
+  }
+  
+  public static function configure($configuration = array()) {
+    Locale::configure();
+    return parent::configure($configuration);
   }
 }

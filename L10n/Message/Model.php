@@ -18,10 +18,11 @@ namespace Bread\L10n\Message;
 use Bread\L10n\Localized;
 
 class Model extends Localized {
+  protected $domain = 'default';
   protected $msgid;
   protected $msgstr;
-  protected $domain = 'default';
   
+  public static $key = array('domain', 'msgid');
   protected static $localized = array(
     'msgstr' => true
   );

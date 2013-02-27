@@ -23,24 +23,33 @@ abstract class Localized extends Bread\Model {
   protected static $localized = array();
   
   public function __get($attribute) {
-    if (isset(static::$localized[$attribute])) {
+    if (in_array($attribute, static::$localized)) {
       if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
         $this->$attribute = new Attribute();
       }
       return $this->$attribute->offsetGet(Locale::$current);
     }
     else {
-      parent::__get($attribute);
+      return parent::__get($attribute);
     }
   }
   
   public function __set($attribute, $value) {
-    if (isset(static::$localized[$attribute])) {
+    if (in_array($attribute, static::$localized)) {
       if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
         $this->$attribute = new Attribute();
       }
-      $this->validate($attribute, $value);
-      $this->$attribute->attach(Locale::$current, $value);
+      var_dump($value);
+      if (is_array($value)) {
+        foreach ($value as $v) {
+          $this->validate($attribute, $v['$val']);
+          $this->$attribute->attach($v['$key'], $v['$val']);
+        }
+      }
+      else {
+        $this->validate($attribute, $value);
+        $this->$attribute->attach(Locale::$current, $value);
+      }
     }
     else {
       parent::__set($attribute, $value);

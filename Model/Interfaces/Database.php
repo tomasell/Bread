@@ -18,10 +18,10 @@ namespace Bread\Model\Interfaces;
 use Bread;
 
 interface Database {
+  public function store(Bread\Model &$model);
+  public function delete(Bread\Model $model);
   public function count($class, $search = array(), $options = array());
   public function first($class, $search = array(), $options = array());
   public function fetch($class, $search = array(), $options = array());
-  public function store(Bread\Model &$model);
-  public function delete(Bread\Model $model);
   public function purge($class);
 }

@@ -35,44 +35,69 @@ class MongoDB implements Interfaces\Database {
   }
 
   public function store(Bread\Model &$model) {
-    $collection = $this->collection(get_class($model));
+    $class = get_class($model);
+    $collection = $this->collection($class);
     $document = $model->attributes();
-    $this->denormalizeDocument($document);
-    $this->link->$collection->save($document);
+    $this->denormalize($document);
+    $this->link->$collection->update($model->key(), $document, array(
+      'upsert' => true, 'multiple' => false
+    ));
+    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
+      'unique' => true
+    ));
+    return $this->promise($model);
   }
 
   public function delete(Bread\Model $model) {
-  }
-
-  public function purge($class) {
+    $collection = $this->collection($model);
+    return $this->promise($this->link->$collection->remove($model->key()));
   }
 
   public function count($class, $search = array(), $options = array()) {
-    return $this->cursor($class, $search, $options)->count(true);
+    return $this->promise($this->cursor($class, $search, $options)->count(true));
   }
 
   public function first($class, $search = array(), $options = array()) {
     $options['limit'] = 1;
-    return $this->fetch($class, $search, $options)->then(function ($fetch) {
-      return Promise\When::resolve(array_shift($fetch));
-    });
+    return $this->fetch($class, $search, $options)->then('current');
   }
 
   public function fetch($class, $search = array(), $options = array()) {
     $models = array();
     $documents = $this->cursor($class, $search, $options);
     foreach ($documents as $document) {
-      $this->normalizeDocument($document);
+      $this->normalize($document);
       $model = new $class($document);
       $models[] = $model;
     }
-    return Promise\When::resolve($models);
+    return $this->promise($models);
+  }
+  
+  public function purge($class) {
+    $collection = $this->collection($class);
+    $this->link->$collection->drop();
+    return $this->promise();
   }
 
+  protected function promise($result = true) {
+    return Promise\When::resolve($result);
+  }
+
+  protected function collection($class) {
+    $class = is_object($class) ? get_class($class) : $class;
+    return $class;
+  }
+  
+  protected function className($collection) {
+    return $collection;
+  }
+  
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
-    $this->normalizeSearch($search);
-    $cursor = $this->link->$collection->find($search);
+    $this->denormalize($search);
+    $cursor = $this->link->$collection->find($search, array(
+      '_id' => false
+    ));
     foreach ($options as $key => $option) {
       switch ($key) {
       case 'skip':
@@ -86,32 +111,8 @@ class MongoDB implements Interfaces\Database {
     return $cursor;
   }
 
-  protected function normalizeSearch(&$search) {
-    array_walk_recursive($search, array(
-      $this, 'formatValue'
-    ));
-  }
-
-  protected function formatValue(&$value) {
-    if (is_subclass_of($value, 'Bread\Model')) {
-      $v = (array) new Database\Reference($value);
-    }
-    elseif ($value instanceof DateTime) {
-      $value = new MongoDate($value->format('U'));
-    }
-  }
-
-  protected function collection($class) {
-    $class = is_object($class) ? get_class($class) : $class;
-    return $class;
-  }
-
-  protected function className($collection) {
-    return $collection;
-  }
-
-  protected function normalizeDocument(&$document) {
-    array_walk_recursive($document, function (&$field) {
+  protected function normalize(&$document) {
+    foreach ($document as &$field) {
       if ($field instanceof MongoId) {
         $field = (string) $field;
       }
@@ -128,21 +129,31 @@ class MongoDB implements Interfaces\Database {
       }
       elseif (MongoDBRef::isRef($field)) {
         $field = MongoDBRef::get($this->link, $field);
-        $this->normalizeDocument($field);
+        $this->normalize($field);
       }
-    });
+      elseif (is_array($field)) {
+        $this->normalize($field);
+      }
+    }
   }
 
-  protected function denormalizeDocument(&$document) {
-    array_walk_recursive($document, function (&$value) {
-      if (is_subclass_of($value, 'Bread\Model')) {
-        $this->store($value);
-        $value = new Database\Reference($value);
+  protected function denormalize(&$document) {
+    foreach ($document as &$field) {
+      if ($field instanceof Bread\Model) {
+        $field->store();
+        $reference = new Database\Reference($field);
+        $field = (array) $reference;
       }
-      elseif (is_a($value, 'Bread\Model\Attribute')) {
-        $value = $value->__toArray();
-        $this->denormalizeDocument($value);
+      elseif ($field instanceof Bread\Model\Attribute) {
+        $field = $field->__toArray();
+        $this->denormalize($field);
       }
-    });
+      elseif ($field instanceof DateTime) {
+        $field = new MongoDate($field->format('U'));
+      }
+      elseif (is_array($field)) {
+        $this->denormalize($field);
+      }
+    }
   }
 }

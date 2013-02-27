@@ -18,27 +18,41 @@ namespace Bread\Model\Database;
 use Bread;
 
 class Reference {
+  public $_class;
+  public $_key;
+  
   public function __construct(Bread\Model $model) {
-    $class = get_class($model);
-    $this->{'$ref'} = $class;
-    $this->{'$id'} = $model->{$class::id()};
+    $this->_class = get_class($model);
+    $this->_key = $model->key();
   }
 
-  public static function is($array) {
-    if ($array instanceof Reference) {
+  public static function is($reference) {
+    if ($reference instanceof Reference) {
       return true;
     }
-    if (isset($array['$ref']) && isset($array['$id'])) {
+    elseif (is_array($reference)) {
+      $reference = (object) $reference;
+    }
+    elseif (is_string($reference)) {
+      $reference = json_decode($reference);
+    }
+    if (isset($reference->_class) && isset($reference->_key)) {
       return true;
     }
     return false;
   }
 
-  public static function fetch($array) {
-    if (!static::is($array)) {
+  public static function fetch($reference) {
+    if (!static::is($reference)) {
       throw new Bread\Exception("Not a valid reference");
     }
-    $class = $array['$ref'];
-    return $class::first(array($class::id() => $array['$id']));
+    elseif (is_string($reference)) {
+      $reference = json_decode($reference, true);
+    }
+    if (is_array($reference)) {
+      $reference = (object) $reference;
+    }
+    $class = $reference->_class;
+    return $class::first($reference->_key);
   }
 }

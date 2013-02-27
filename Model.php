@@ -20,10 +20,11 @@ use Bread\Model;
 use JsonSerializable;
 
 abstract class Model extends Core\Dough implements JsonSerializable {
+  public static $key = array();
   protected static $cache;
   protected static $database;
   protected static $attributes = array();
-  protected static $configuration = array(
+  private static $configuration = array(
     'database' => array(
       'url' => 'mongodb://localhost/test'
     )
@@ -61,15 +62,42 @@ abstract class Model extends Core\Dough implements JsonSerializable {
     return $this->attributes();
   }
 
-  public function attributes() {
-    return get_object_vars($this);
+  public function key() {
+    return $this->attributes(static::$key);
+  }
+
+  public function attributes($attributes = null) {
+    return $attributes ? array_intersect_key(get_object_vars($this), array_flip($attributes))
+      : get_object_vars($this);
   }
 
   public function store() {
     static::database()->store($this);
   }
 
-  protected function validate($attribute, $value) {
+  public function delete() {
+    static::database()->delete($this);
+  }
+
+  public static function count($search = array(), $options = array()) {
+    return static::call(__FUNCTION__, $search, $options);
+  }
+
+  public static function first($search = array(), $options = array()) {
+    return static::call(__FUNCTION__, $search, $options);
+  }
+
+  public static function fetch($search = array(), $options = array()) {
+    return static::call(__FUNCTION__, $search, $options);
+  }
+
+  public static function purge() {
+    return static::database()->purge(get_called_class());
+  }
+
+  public static function id() {
+    $attributes = array_keys(get_class_vars(get_called_class()));
+    return array_shift($attributes);
   }
 
   public static function configure($configuration = array()) {
@@ -86,37 +114,32 @@ abstract class Model extends Core\Dough implements JsonSerializable {
     return $configuration;
   }
 
-  public static function count($search = array(), $options = array()) {
-    return static::database()->count(get_called_class(), $search, $options);
+  protected function validate($attribute, $value) {
   }
 
-  public static function first($search = array(), $options = array()) {
-    $self = get_called_class();
-    $key = $self . md5(json_encode($search + $options));
-    //return static::$cache->get($key)->then(null, function ($key) use ($search,
-    //  $options) {
-    return static::database()->first(get_called_class(), $search, $options)->then(function (
-      $result) use ($key) {
-      static::$cache->set($key, $result);
-      return $result;
-    });
-    //});
-  }
-
-  public static function fetch($search = array(), $options = array()) {
-    return static::database()->fetch(get_called_class(), $search, $options);
-  }
-  
-  public static function id() {
-    $attributes = array_keys(get_class_vars(get_called_class()));
-    return array_shift($attributes);
-  }
-  
   protected static function database() {
     $self = get_called_class();
     $self::configure();
     if (isset(self::$database[$self])) {
       return self::$database[$self];
     }
+  }
+  
+  protected static function call($method, $search = array(), $options = array()) {
+    static::configure();
+    $self = get_called_class();
+    $key = implode('::', array(
+        $self,
+        $method,
+        md5(json_encode($search + $options))
+    ));
+    return static::$cache->get($key)->then(null, function ($key) use ($search,
+        $options, $self, $method) {
+      return $self::database()->$method($self, $search, $options)->then(function (
+          $result) use ($key, $self) {
+        $self::$cache->set($key, $result);
+        return $result;
+      });
+    });
   }
 }

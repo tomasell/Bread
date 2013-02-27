@@ -35,15 +35,15 @@ class MySQL implements Interfaces\Database {
 
   public function __construct($url) {
     $conn = array_merge(array(
-      'host' => 'localhost',
-      'port' => self::DEFAULT_PORT,
-      'user' => null,
-      'pass' => null,
-      'path' => null
+        'host' => 'localhost',
+        'port' => self::DEFAULT_PORT,
+        'user' => null,
+        'pass' => null,
+        'path' => null
     ), parse_url($url));
     $this->database = ltrim($conn['path'], '/');
     if (!$this->link = new mysqli($conn['host'], $conn['user'], $conn['pass'],
-      null, $conn['port'])) {
+        null, $conn['port'])) {
       throw new Exception('Cannot connect MySQL driver to ' . $conn['host']);
     }
     $this->link->set_charset('utf8');
@@ -54,7 +54,7 @@ class MySQL implements Interfaces\Database {
     }
     if (!$this->tableExists('_index')) {
       $query = file_get_contents(__DIR__ . DS . 'MySQL' . DS
-        . 'create-index-table.sql');
+          . 'create-index-table.sql');
       $this->query($query);
     }
   }
@@ -63,102 +63,6 @@ class MySQL implements Interfaces\Database {
     if ($this->link) {
       $this->link->close();
     }
-  }
-
-  protected function query() {
-    $args = func_get_args();
-    $query = array_shift($args);
-    if (is_array(current($args))) {
-      $args = array_shift($args);
-    }
-    foreach ($args as &$arg) {
-      $arg = $this->link->real_escape_string($arg);
-    }
-    $query = vsprintf($query, $args);
-    $result = $this->link->query($query);
-    $rows = array();
-    if (is_bool($result)) {
-      $cache = $result;
-    }
-    else {
-      while ($row = $result->fetch_assoc()) {
-        $rows[] = $row;
-      }
-      $result->free();
-      $cache = $rows;
-    }
-    return $cache;
-  }
-
-  protected function normalize(&$document, $class) {
-    foreach ($document as $field => &$value) {
-      if (is_array($value)) {
-        foreach ($value as &$v) {
-          $this->normalizeValue($v, $field, $class);
-        }
-        continue;
-      }
-      elseif($value) {
-        $this->normalizeValue($value, $field, $class);
-      }
-    }
-  }
-  
-  protected function normalizeValue(&$value, $field, $class) {
-    switch ($class::get("attributes.$field.type")) {
-      case 'date':
-      case 'datetime':
-        $value = new DateTime($value);
-        break;
-    }
-    if (Database\Reference::is($value)) {
-      Database\Reference::fetch($value)->then(function ($model) use (&$value) {
-        $value = $model;
-      });
-    }
-  }
-
-  protected function denormalize(&$document) {
-    foreach ($document as &$field) {
-      if ($field instanceof Bread\Model) {
-        $field->store();
-        $reference = new Database\Reference($field);
-        $field = json_encode($reference);
-      }
-      elseif ($field instanceof Bread\Model\Attribute) {
-        $field = $field->__toArray();
-        $this->denormalize($field);
-      }
-      elseif ($field instanceof DateTime) {
-        $field = $field->format(self::DATETIME_FORMAT);
-      }
-      elseif (is_array($field)) {
-        $this->denormalize($field);
-      }
-    }
-  }
-
-  protected function placeholders(&$columns, $table) {
-    $placeholders = array();
-    foreach ($columns as $column => $value) {
-      if (is_array($value)) {
-        continue;
-      }
-      if (is_null($value) || trim($value) === '') {
-        $placeholders[] = "NULL";
-        unset($columns[$column]);
-      }
-      else {
-        switch ($this->type($table, $column)) {
-        case 'int':
-          $placeholders[] = "%s";
-          break;
-        default:
-          $placeholders[] = "'%s'";
-        }
-      }
-    }
-    return $placeholders;
   }
 
   public function store(Bread\Model &$model) {
@@ -170,9 +74,6 @@ class MySQL implements Interfaces\Database {
       $fields = $model->attributes();
       $this->denormalize($fields);
       foreach ($tables as $table) {
-        $key = array_map(function ($value) {
-          return "_$value";
-        }, $class::$key);
         $values = array_intersect_key($fields, array_flip($this->columns($table)));
         $columns = array_keys($values);
         $placeholders = $this->placeholders($values, $table);
@@ -180,33 +81,33 @@ class MySQL implements Interfaces\Database {
         $update = array();
         foreach ($values as $column => &$value) {
           if (is_array($value)) {
-            $_columns = array_merge($key, array(
-              '_key'
-            ), $columns);
+            $_columns = array_merge($class::$key, array(
+                '_', $column
+            ));
             $__columns = array_flip($_columns);
             $_placeholders = $this->placeholders($__columns, $table);
-            $_update[] = "`$column` = VALUES(`$column`)";
+            $_update = array("`$column` = VALUES(`$column`)");
             $query = "INSERT INTO `$table` (`" . implode('`, `', $_columns)
-              . "`) VALUES (" . implode(', ', $_placeholders)
-              . ") ON DUPLICATE KEY UPDATE " . implode(', ', $_update);
+            . "`) VALUES (" . implode(', ', $_placeholders)
+            . ") ON DUPLICATE KEY UPDATE " . implode(', ', $_update);
             foreach ($value as $k => $v) {
               $this->query($query, array_merge($model->key(), array(
-                $k, $v
+                  $k, $v
               )));
             }
             $where = $this->normalizeSearch(array(
-              $model->key()
+                $model->key()
             ));
-            $query = "DELETE FROM `$table` WHERE $where AND `_key` >= %d";
+            $query = "DELETE FROM `$table` WHERE $where AND `_` >= %d";
             $this->query($query, count($value));
             continue 2;
           }
           $update[] = "`$column` = VALUES(`$column`)";
         }
         $query = "INSERT INTO `$table` (`" . implode('`, `', $columns)
-          . "`) VALUES ";
+        . "`) VALUES ";
         $query .= "(" . implode(', ', $placeholders)
-          . ") ON DUPLICATE KEY UPDATE " . implode(', ', $update);
+        . ") ON DUPLICATE KEY UPDATE " . implode(', ', $update);
         $this->query($query, $values);
       }
     } catch (Exception $e) {
@@ -236,16 +137,17 @@ class MySQL implements Interfaces\Database {
   public function fetch($class, $search = array(), $options = array()) {
     $models = array();
     $where = $this->normalizeSearch(array(
-      $search
+        $search
     ));
     $table = $this->tableName($class);
-    $key = implode('`, `', $class::$key);
-    $query = "SELECT `$key` FROM `$table` WHERE $where GROUP BY `$key`";
+    $tables = implode('`, `', $this->tablesFor($class));
+    $key = implode("`, `$table`.`", $class::$key);
+    $query = "SELECT `{$table}`.`{$key}` FROM `{$tables}` WHERE {$where} GROUP BY `{$table}`.`{$key}`";
     foreach ($this->query($query) as $result) {
       $where = $this->normalizeSearch(array(
-        $result
+          $result
       ));
-      $query = "SELECT * FROM `$table` WHERE $where";
+      $query = "SELECT * FROM `{$table}` WHERE {$where}";
       foreach ($this->query($query) as $row) {
         $attributes = array();
         $properties = array_merge($class::get("attributes"), $row);
@@ -253,12 +155,10 @@ class MySQL implements Interfaces\Database {
           if ($class::get("attributes.$attribute.multiple")) {
             $multiple = array();
             $where = $this->normalizeSearch(array(
-              array_combine(array_map(function ($value) {
-                return "_$value";
-              }, array_keys($result)), $result)
+                $result
             ));
-            foreach ($this->query("SELECT `_key`, `$attribute` FROM `{$table}_{$attribute}` WHERE $where") as $r) {
-              $multiple[$r['_key']] = $r[$attribute];
+            foreach ($this->query("SELECT `_`, `{$attribute}` FROM `{$table}_{$attribute}` WHERE {$where}") as $r) {
+              $multiple[$r['_']] = $r[$attribute];
             }
             $value = $multiple;
           }
@@ -275,35 +175,226 @@ class MySQL implements Interfaces\Database {
     ;
   }
 
+  protected function denormalize(&$document) {
+    foreach ($document as &$field) {
+      if (is_array($field)) {
+        foreach ($field as &$v) {
+          $this->denormalizeValue($v);
+        }
+        continue;
+      }
+      elseif($field) {
+        $this->denormalizeValue($field);
+      }
+    }
+  }
+
+  protected function denormalizeValue(&$value) {
+    if ($value instanceof Bread\Model) {
+      $value->store();
+      $reference = new Database\Reference($value);
+      $value = json_encode($reference);
+    }
+    elseif ($value instanceof Bread\Model\Attribute) {
+      $value = $value->__toArray();
+      foreach ($value as &$v) {
+        $this->denormalizeValue($value);
+      }
+    }
+    elseif ($value instanceof DateTime) {
+      $value = $value->format(self::DATETIME_FORMAT);
+    }
+  }
+
+  protected function normalize(&$document, $class) {
+    foreach ($document as $field => &$value) {
+      if (is_array($value)) {
+        foreach ($value as &$v) {
+          $this->normalizeValue($v, $field, $class);
+        }
+        continue;
+      }
+      elseif($value) {
+        $this->normalizeValue($value, $field, $class);
+      }
+    }
+  }
+
+  protected function normalizeValue(&$value, $field, $class) {
+    switch ($class::get("attributes.$field.type")) {
+      case 'number':
+        $step = $class::get("attributes.$field.step");
+        $value = (preg_match('/^any$|\./', $step)) ? (float) $value : (int) $value;
+        break;
+      case 'month':
+      case 'week':
+      case 'time':
+      case 'date':
+      case 'datetime':
+      case 'datetime-local':
+        $value = new DateTime($value);
+        break;
+    }
+    if (Database\Reference::is($value)) {
+      Database\Reference::fetch($value)->then(function ($model) use (&$value) {
+        $value = $model;
+      });
+    }
+  }
+
+  protected function formatValue(&$v, &$op = '=') {
+    $this->denormalizeValue($v);
+    if (is_string($v)) {
+      $v = "'" . $this->link->real_escape_string($v) . "'";
+    }
+    elseif (is_null($v)) {
+      $op = "IS";
+      $v = "NULL";
+    }
+  }
+
+  protected function normalizeSearch($conditions = array(), $logic = '$and',
+      $op = '=') {
+    $where = array();
+    foreach ($conditions as $search) {
+      $w = array();
+      foreach ($search as $attribute => $condition) {
+        switch ($attribute) {
+          case '$and':
+          case '$or':
+            $where[] = "(" . $this->normalizeSearch($condition, $attribute) . ")";
+            continue 2;
+          case '$nor':
+            $where[] = "NOT (" . $this->normalizeSearch($condition, '$or') . ")";
+            continue 2;
+          default:
+            if (is_array($condition)) {
+              $c = array();
+              foreach ($condition as $k => $v) {
+                switch ($k) {
+                  case '$in':
+                    array_walk($v, array(
+                    $this, 'formatValue'
+                        ));
+                        $c[] = "`$attribute` IN (" . implode(" , ", $v) . ")";
+                        continue 2;
+                  case '$nin':
+                    array_walk($v, array(
+                    $this, 'formatValue'
+                        ));
+                        $c[] = "`$attribute` NOT IN (" . implode(" , ", $v) . ")";
+                        continue 2;
+                  case '$lt':
+                    $op = '<';
+                    break;
+                  case '$lte':
+                    $op = '<=';
+                    break;
+                  case '$gt':
+                    $op = '>';
+                    break;
+                  case '$gte':
+                    $op = '>=';
+                    break;
+                  case '$ne':
+                    $op = 'IS NOT';
+                    break;
+                  case '$all':
+                    $all = array_map(function ($value) use ($attribute) {
+                      return array(
+                          $attribute => $value
+                      );
+                    }, $v);
+                    $c[] = $this->normalizeSearch($all, '$or');
+                    continue 2;
+                  case '$not':
+                    $not = array(
+                    $attribute => $v
+                    );
+                    $c[] = "NOT "
+                        . $this->normalizeSearch(array(
+                            $not
+                        ));
+                        continue 2;
+                }
+                $this->formatValue($v, $op);
+                $c[] = "`$attribute` $op $v";
+                $op = '=';
+              }
+              $w[] = "(" . implode(" AND ", $c) . ")";
+              continue 2;
+            }
+            $this->formatValue($condition, $op);
+            $w[] = "`$attribute` $op $condition";
+            $op = '=';
+        }
+      }
+      empty($w) || $where[] = implode(" AND ", $w);
+    }
+    switch ($logic) {
+      case '$and':
+        $logic = 'AND';
+        break;
+      case '$or':
+        $logic = 'OR';
+        break;
+    }
+    $where = implode(" $logic ", $where);
+    return $where ? "$where" : '1';
+  }
+
+  protected function placeholders(&$columns, $table) {
+    $placeholders = array();
+    foreach ($columns as $column => $value) {
+      if (is_array($value)) {
+        continue;
+      }
+      if (is_null($value) || trim($value) === '') {
+        $placeholders[] = "NULL";
+        unset($columns[$column]);
+      }
+      else {
+        switch ($this->type($table, $column)) {
+          case 'int':
+            $placeholders[] = "%s";
+            break;
+          default:
+            $placeholders[] = "'%s'";
+        }
+      }
+    }
+    return $placeholders;
+  }
+
   protected function describe($table) {
     $keys = array(
-      'primary' => array(), 'unique' => array(), 'indexes' => array()
+        'primary' => array(), 'unique' => array(), 'indexes' => array()
     );
     $fields = array();
     foreach ($this->tables("$table%") as $table) {
       $describe = $this->query("DESCRIBE `%s`", $table);
       foreach ($describe as $field) {
         $fields[$field['Field']] = array(
-          'type' => $field['Type'],
-          'null' => $field['Null'] === 'YES' ? true : false,
-          'default' => $field['Default'],
-          'extra' => $field['Extra']
+            'type' => $field['Type'],
+            'null' => $field['Null'] === 'YES' ? true : false,
+            'default' => $field['Default'],
+            'extra' => $field['Extra']
         );
         switch ($field['Key']) {
-        case 'PRI':
-          $keys['primary'][] = $field['Field'];
-          break;
-        case 'UNI':
-          $keys['unique'][] = $field['Field'];
-          break;
-        case 'IND':
-          $keys['indexes'][] = $field['Field'];
-          break;
+          case 'PRI':
+            $keys['primary'][] = $field['Field'];
+            break;
+          case 'UNI':
+            $keys['unique'][] = $field['Field'];
+            break;
+          case 'IND':
+            $keys['indexes'][] = $field['Field'];
+            break;
         }
       }
     }
     return array(
-      'fields' => $fields, 'keys' => $keys
+        'fields' => $fields, 'keys' => $keys
     );
   }
 
@@ -350,7 +441,7 @@ class MySQL implements Interfaces\Database {
       }
       $table = $_table;
       $this->query("INSERT INTO `" . self::INDEX_TABLE
-        . "` VALUES ('%s', '%s')", $class, $table);
+          . "` VALUES ('%s', '%s')", $class, $table);
     }
     $key = implode('`, `', $class::$key);
     if (!$this->tableExists($table)) {
@@ -372,16 +463,12 @@ class MySQL implements Interfaces\Database {
       foreach ($multiples as $column) {
         $query = "CREATE TABLE IF NOT EXISTS `{$table}_{$column}` (\n\t";
         foreach ($class::$key as $k) {
-          $query .= $this->createQuery($class, $k, "_$k");
+          $query .= $this->createQuery($class, $k);
         }
-        $_key = array_map(function ($key) {
-          return "_$key";
-        }, $class::$key);
-        $_key = implode('`, `', $_key);
-        $query .= "`_key` INT unsigned NOT NULL DEFAULT 0,\n\t";
+        $query .= "`_` INT unsigned NOT NULL DEFAULT 0,\n\t";
         $query .= $this->createQuery($class, $column);
-        $query .= "PRIMARY KEY (`$_key`, `_key`),\n\t";
-        $query .= "FOREIGN KEY (`$_key`) REFERENCES `$table` (`$key`) ON DELETE CASCADE ON UPDATE CASCADE\n";
+        $query .= "PRIMARY KEY (`$key`, `_`),\n\t";
+        $query .= "FOREIGN KEY (`$key`) REFERENCES `$table` (`$key`) ON DELETE CASCADE ON UPDATE CASCADE\n";
         $query .= ") ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci";
         $queries[] = $query;
       }
@@ -420,15 +507,71 @@ class MySQL implements Interfaces\Database {
     return null;
   }
 
+  protected function createType($class, $column, $options = array()) {
+    extract(array_merge(array(
+    'type' => null,
+    'multiple' => false,
+    'step' => 1,
+    'min' => null,
+    'null' => true,
+    'default' => null
+    ), $options));
+    if (is_array($default)) {
+      $default = implode(",", array_map('var_export', $default, array_fill(0, count($default), true)));
+    }
+    elseif ($default) {
+      $default = var_export($this->denormalizeValue($default, $column, $class), true);
+    }
+    $default = is_null($default) ? ($null ? "DEFAULT NULL" : '')
+    : "DEFAULT $default";
+    $null = $null ? "" : "NOT NULL";
+    if (is_array($type)) {
+      $implode = implode(",", array_map('var_export', $type, array_fill(0, count($type), true)));
+      return $multiple ? "`$column` SET($implode) $null $default,\n\t"
+      : "`$column` ENUM($implode) $null $default,\n\t";
+    }
+    if ($type === 'number') {
+      if (is_numeric($min)) {
+        $sign = ($min < 0) ? null : 'unsigned';
+      }
+      $type = (preg_match('/^any$|\./', $step)) ? 'float' : 'int';
+    }
+    switch ($type) {
+      case 'int':
+        return "`$column` INT $sign $null $default,\n\t";
+      case 'float':
+        return "`$column` FLOAT $sign $null $default,\n\t";
+      case 'text':
+      case 'password':
+        return "`$column` VARCHAR(128) $null $default,\n\t";
+      case 'textarea':
+        return "`$column` TEXT,\n\t";
+      case 'date':
+      case 'month':
+      case 'week':
+        return "`$column` DATE $null $default,\n\t";
+      case 'time':
+        return "`$column` TIME $null $default,\n\t";
+      case 'datetime':
+      case 'datetime-local':
+        return "`$column` DATETIME $null $default,\n\t";
+      case 'file':
+        return "`$column` LONGBLOB $null $default,\n\t";
+      case 'checkbox':
+        return "`$column` TINYINT(1) $null $default,\n\t";
+    }
+    return "`$column` VARCHAR(128) $null $default,\n\t";
+  }
+
   protected function createQuery($class, $attribute, $column = null,
-    $null = null) {
+      $null = null) {
     $options = array_merge(array(
-      'type' => 'text',
-      'multiple' => false,
-      'step' => 1,
-      'min' => null,
-      'null' => true,
-      'default' => null
+        'type' => 'text',
+        'multiple' => false,
+        'step' => 1,
+        'min' => null,
+        'null' => true,
+        'default' => null
     ), (array) $class::get("attributes.$attribute"));
     if (is_bool($null)) {
       $options['null'] = $null;
@@ -438,170 +581,31 @@ class MySQL implements Interfaces\Database {
       $options['type'] = 'text';
     }
     $column = $column ? : $attribute;
-    return $this->createType($column, $options);
+    return $this->createType($class, $column, $options);
   }
 
-  protected function createType($column, $options = array()) {
-    extract(array_merge(array(
-      'type' => null,
-      'multiple' => false,
-      'step' => 1,
-      'min' => null,
-      'null' => true,
-      'default' => null
-    ), $options));
-    if (is_array($default)) {
-      $default = implode(",", array_map('var_export', $default, array_fill(0, count($default), true)));
+  protected function query() {
+    $args = func_get_args();
+    $query = array_shift($args);
+    if (is_array(current($args))) {
+      $args = array_shift($args);
     }
-    elseif ($default) {
-      $default = var_export($this->denormalizeValue($default, $column), true);
+    foreach ($args as &$arg) {
+      $arg = $this->link->real_escape_string($arg);
     }
-    $default = is_null($default) ? ($null ? "DEFAULT NULL" : '')
-      : "DEFAULT $default";
-    $null = $null ? "" : "NOT NULL";
-    if (is_array($type)) {
-      $implode = implode(",", array_map('var_export', $type, array_fill(0, count($type), true)));
-      return $multiple ? "`$column` SET($implode) $null $default,\n\t"
-        : "`$column` ENUM($implode) $null $default,\n\t";
+    $query = vsprintf($query, $args);
+    $result = $this->link->query($query);
+    $rows = array();
+    if (is_bool($result)) {
+      $cache = $result;
     }
-    if ($column === 'id') {
-      $default = 'AUTO_INCREMENT';
-    }
-    if ($type === 'number') {
-      if (is_numeric($min)) {
-        $min = ($min < 0) ? null : 'unsigned';
+    else {
+      while ($row = $result->fetch_assoc()) {
+        $rows[] = $row;
       }
-      $type = (preg_match('/^any$|\./', $step)) ? 'float' : 'int';
+      $result->free();
+      $cache = $rows;
     }
-    switch ($type) {
-    case 'int':
-      return "`$column` INT $min $null $default,\n\t";
-    case 'float':
-      return "`$column` FLOAT $min $null $default,\n\t";
-    case 'text':
-      return "`$column` VARCHAR(128) $null $default,\n\t";
-    case 'textarea':
-      return "`$column` TEXT,\n\t";
-    case 'date':
-      return "`$column` DATE $null $default,\n\t";
-    case 'time':
-      return "`$column` TIME $null $default,\n\t";
-    case 'datetime':
-      return "`$column` DATETIME $null $default,\n\t";
-    case 'file':
-    case 'data':
-    case 'blob':
-      return "`$column` MEDIUMBLOB $null $default,\n\t";
-    case 'boolean':
-    case 'bool':
-      return "`$column` TINYINT(1) $null $default,\n\t";
-    }
-    return "`$column` VARCHAR(128) $null $default,\n\t";
-  }
-
-  protected function normalizeSearch($conditions = [], $logic = '$and',
-    $op = '=') {
-    $where = [];
-    foreach ($conditions as $search) {
-      $w = array();
-      foreach ($search as $attribute => $condition) {
-        switch ($attribute) {
-        case '$and':
-        case '$or':
-          $where[] = "(" . $this->normalizeSearch($condition, $attribute) . ")";
-          continue 2;
-        case '$nor':
-          $where[] = "NOT (" . $this->normalizeSearch($condition, '$or') . ")";
-          continue 2;
-        default:
-          if (is_array($condition)) {
-            $c = array();
-            foreach ($condition as $k => $v) {
-              switch ($k) {
-              case '$in':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
-                $c[] = "`$attribute` IN (" . implode(" , ", $v) . ")";
-                continue 2;
-              case '$nin':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
-                $c[] = "`$attribute` NOT IN (" . implode(" , ", $v) . ")";
-                continue 2;
-              case '$lt':
-                $op = '<';
-                break;
-              case '$lte':
-                $op = '<=';
-                break;
-              case '$gt':
-                $op = '>';
-                break;
-              case '$gte':
-                $op = '>=';
-                break;
-              case '$ne':
-                $op = 'IS NOT';
-                break;
-              case '$all':
-                $all = array_map(function ($value) use ($attribute) {
-                  return array(
-                    $attribute => $value
-                  );
-                }, $v);
-                $c[] = $this->normalizeSearch($all, '$or');
-                continue 2;
-              case '$not':
-                $not = array(
-                  $attribute => $v
-                );
-                $c[] = "NOT "
-                  . $this->normalizeSearch(array(
-                    $not
-                  ));
-                continue 2;
-              }
-              $this->formatValue($v, $op);
-              $c[] = "`$attribute` $op $v";
-              $op = '=';
-            }
-            $w[] = "(" . implode(" AND ", $c) . ")";
-            continue 2;
-          }
-          $this->formatValue($condition, $op);
-          $w[] = "`$attribute` $op $condition";
-          $op = '=';
-        }
-      }
-      empty($w) || $where[] = implode(" AND ", $w);
-    }
-    switch ($logic) {
-    case '$and':
-      $logic = 'AND';
-      break;
-    case '$or':
-      $logic = 'OR';
-      break;
-    }
-    $where = implode(" $logic ", $where);
-    return $where ? "$where" : '1';
-  }
-
-  protected function formatValue(&$v, &$op = '=') {
-    if ($v instanceof Bread\Model) {
-      $v = json_encode(new Database\Reference($v));
-    }
-    if (is_string($v)) {
-      $v = "'" . $this->link->real_escape_string($v) . "'";
-    }
-    elseif (is_null($v)) {
-      $op = "IS";
-      $v = "NULL";
-    }
-    elseif ($v instanceof DateTime) {
-      $v = $v->format(static::DATETIME_FORMAT);
-    }
+    return $cache;
   }
 }

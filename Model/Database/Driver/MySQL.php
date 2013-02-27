@@ -106,12 +106,20 @@ class MySQL implements Interfaces\Database {
 
   public function fetch($class, $search = [], $options = []) {
     $models = array();
-    $where = $this->normalizeSearch($class, array(
+    //creo array innerjoin
+    $innerJoin = array();
+    $where = $this
+      ->normalizeSearch($class, array(
         $search
-      ));
+      ), $innerJoin);
+
+    //     $innerJoin = "`" . implode(' INNER JOIN `', $innerJoin);
+    //     var_dump($innerJoin);
+    //     var_dump($where);
     $table = $class::$configuration['database']['options']['table'];
-    $key = $class::$configuration['database']['options']['key'];
+    $key = implode(",", $class::$configuration['database']['options']['key']);
     $query = "SELECT `$key` FROM `$table` WHERE $where GROUP BY `$key`";
+    //     var_dump($query);
     foreach ($this->query($query) as $result) {
       $condition = $result[$key];
       $this->formatValue($condition);
@@ -133,7 +141,7 @@ class MySQL implements Interfaces\Database {
     }
     $condition = implode(' AND ', $conditions);
     $query = "SELECT * FROM `$table` WHERE $condition";
-    var_dump($query);
+    //     var_dump($query);
     foreach ($this->query($query) as $i => $row) {
       $key = $row[$k];
       $attributes[$i] = array();
@@ -142,13 +150,7 @@ class MySQL implements Interfaces\Database {
           $property['multiple'] = false;
         }
         $property = (object) $property;
-        if (isset($row[$attribute])) {
-          $attributes[$i][$attribute] = $row[$attribute];
-        } elseif (is_array($property->type)) {
-          $attributes[$i][$attribute] = $this
-            ->_fetch($property->type, "{$table}_{$attribute}", $keys, $attribute,
-              $property->multiple, true);
-        } elseif ($property->multiple) {
+        if ($property->multiple) {
           $keys[$k] = $key;
           $attributes[$i][$attribute] = array_map(
             function ($value) use ($attribute) {
@@ -165,10 +167,15 @@ class MySQL implements Interfaces\Database {
           $tmpRef[] = $this
             ->_fetch(
               array(
-                '$ref' => ['type' => 'text'], '$id' => ['type' => 'text']
-              ), "{$table}_{$attribute}", $keys, $k, $property->multiple, true);
+                "$attribute" => ['type' => 'text']
+              ), $table, $keys, $k, $property->multiple, true);
+          //           $tmpRef[0] = explode(",", $tmpRef[0]->$attribute);
 
-          $attributes[$i][$attribute] = $tmpRef[0];//Reference::fetch($tmpRef[0]);
+          //TODO create reference
+          $json = implode("\\\\", explode("\\", $tmpRef[0]->{$attribute}));
+          $attributes[$i][$attribute] = json_decode($json, true);//Reference::fetch($tmpRef[0]);
+        } elseif (isset($row[$attribute])) {
+          $attributes[$i][$attribute] = $row[$attribute];
         }
       }
     }
@@ -181,8 +188,8 @@ class MySQL implements Interfaces\Database {
     return $multiple ? $attributes : array_shift($attributes);
   }
 
-  protected function normalizeSearch($class, $conditions = [], $logic = '$and',
-    $op = '=') {
+  protected function normalizeSearch($class, $conditions = [], &$innerJoin,
+    $logic = '$and', $op = '=') {
     $where = [];
     foreach ($conditions as $search) {
       $w = array();
@@ -191,23 +198,51 @@ class MySQL implements Interfaces\Database {
         case '$and':
         case '$or':
           $where[] = "("
-            . $this->normalizeSearch($class, $condition, $attribute) . ")";
+            . $this
+              ->normalizeSearch($class, $condition, $innerJoin, $attribute)
+            . ")";
           continue 2;
         case '$nor':
           $where[] = "NOT ("
-            . $this->normalizeSearch($class, $condition, '$or') . ")";
+            . $this->normalizeSearch($class, $condition, $innerJoin, '$or')
+            . ")";
           continue 2;
         default:
-        //           $explode = explode('.', $attribute);
-        //           $attribute = array_shift($explode);
-        //           $type = $class::get("attributes.$attribute.type");
-        //           if (is_array($type)) {
-        //             // TODO type is array
-        //           } elseif (is_subclass_of($type, 'Bread\Model')) {
-        //             // TODO type is Model
-        //           } elseif ($class::get("attributes.$attribute.multiple")) {
-        //             // TODO fai il JOIN
-        //           }
+        //           $on = array();
+          $collectionTable = $class::$configuration['database']['options']['table'];
+          $explode = explode('.', $attribute);
+          $attribute = $explode[count($explode) - 1];
+          unset($explode[count($explode) - 1]);
+          //           $innerJoin[$this->rename($innerJoin, $collectionTable)] = $collectionTable
+          //             . "` as `" . $this->rename($innerJoin, $collectionTable) . "`";
+          //           $on[implode(",",$class::$configuration['database']['options']['key'])] = implode(",",$class::$configuration['database']['options']['key']);
+          //           $innerJoin[$this->rename($innerJoin, $collectionTable)] = $collectionTable
+          //             . "` as `" . $this->rename($innerJoin, $collectionTable)
+          //             . "` USING (`" . implode("`,`", $on) . "`)";
+          //           foreach ($explode as $i => $scan) {
+          //             $fullpath = (implode("_",
+          //               array_slice(
+          //                 array_merge(
+          //                   array(
+          //                     $collectionTable
+          //                   ), $explode), 0, $i + 1)));
+          //             $innerJoin[$this->rename($innerJoin, $scan)] = $fullpath . "_"
+          //               . $scan . "` as `" . $this->rename($innerJoin, $scan)
+          //               . "` USING (`" . implode("`,`", $on) . "`)";
+          //             if (array_key_exists($scan, $class::$attributes))
+          //               $property = $class::$attributes[$scan];
+          //             else
+          //               $on = array(
+          //                 $collectionTable
+          //               );
+          //             if (is_array($property['type'])) {
+          //               $on[$scan] = $scan;
+          //             } else {
+          //               $on[implode(",",$class::$configuration['database']['options']['key'])] = implode(",",$class::$configuration['database']['options']['key']);
+          //             }
+          //           }
+
+          //
           if (is_array($condition)) {
             $c = array();
             foreach ($condition as $k => $v) {
@@ -248,7 +283,7 @@ class MySQL implements Interfaces\Database {
                       $attribute => $value
                     );
                   }, $v);
-                $c[] = $this->normalizeSearch($class, $all, '$or');
+                $c[] = $this->normalizeSearch($class, $all, $innerJoin, '$or');
                 continue 2;
               case '$not':
                 $not = array(
@@ -259,7 +294,7 @@ class MySQL implements Interfaces\Database {
                     ->normalizeSearch($class,
                       array(
                         $not
-                      ));
+                      ), $innerJoin);
                 continue 2;
               }
               $this->formatValue($v, $op);
@@ -288,6 +323,26 @@ class MySQL implements Interfaces\Database {
     return $where ? "$where" : '1';
   }
 
+  protected function innerJoin($firstClass, $secondClass, $condition, $i) {
+    $firstKeys = $firstClass::$configuration['database']['options']['key'];
+    $firstRename = $firstClass::$configuration['database']['options']['table'][0];
+    $using = "`" . implode("`", $firstKeys) . "`";
+    $query = "`" . $firstClass::$configuration['database']['options']['table']
+      . "` as `" . $firstRename . " ` INNER JOIN `$secondClass` as `"
+      . $secondClass[0] . "` ON ($using) ";
+    var_dump($query);
+  }
+
+  protected function rename($innerjoin = array(), $name) {
+    $count = 1;
+    foreach ($innerjoin as $index => $value) {
+      if (strcmp($index, $name . "_$count") == 0) {
+        $count++;
+      } else
+        return $name . "_$count";
+    }
+    return $name . "_$count";
+  }
   protected function formatValue(&$v, &$op = '=') {
     if (is_string($v)) {
       $v = "'" . $this->link->real_escape_string($v) . "'";

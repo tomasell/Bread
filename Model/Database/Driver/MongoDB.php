@@ -38,7 +38,7 @@ class MongoDB implements Interfaces\Database {
     $class = get_class($model);
     $collection = $this->collection($class);
     $document = $model->attributes();
-    $this->denormalize($document);
+    $this->denormalize($class, $document);
     $this->link->$collection->update($model->key(), $document, array(
       'upsert' => true, 'multiple' => false
     ));
@@ -72,7 +72,7 @@ class MongoDB implements Interfaces\Database {
     }
     return $this->promise($models);
   }
-  
+
   public function purge($class) {
     $collection = $this->collection($class);
     $this->link->$collection->drop();
@@ -87,14 +87,14 @@ class MongoDB implements Interfaces\Database {
     $class = is_object($class) ? get_class($class) : $class;
     return $class;
   }
-  
+
   protected function className($collection) {
     return $collection;
   }
-  
+
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
-    $this->denormalize($search);
+    $this->denormalize($class, $search);
     $cursor = $this->link->$collection->find($search, array(
       '_id' => false
     ));
@@ -137,22 +137,37 @@ class MongoDB implements Interfaces\Database {
     }
   }
 
-  protected function denormalize(&$document) {
-    foreach ($document as &$field) {
-      if ($field instanceof Bread\Model) {
-        $field->store();
-        $reference = new Database\Reference($field);
-        $field = (array) $reference;
+  protected function denormalize($class, &$document) {
+    foreach ($document as $field => &$value) {
+      $attribute = $field;
+      $explode = explode('.', $attribute);
+      $field = array_shift($explode);
+      if ($explode) {
+        unset($document[$attribute]);
+        $type = $class::get("attributes.$field.type");
+        $type::fetch(array(
+          implode('.', $explode) => $value
+        ))->then(function ($models) use (&$value) {
+          $value = array(
+            '$in' => $models
+          );
+        });
+        $document[$field] = &$value;
       }
-      elseif ($field instanceof Bread\Model\Attribute) {
-        $field = $field->__toArray();
-        $this->denormalize($field);
+      if ($value instanceof Bread\Model) {
+        $value->store();
+        $reference = new Database\Reference($value);
+        $value = (array) $reference;
       }
-      elseif ($field instanceof DateTime) {
-        $field = new MongoDate($field->format('U'));
+      elseif ($value instanceof Bread\Model\Attribute) {
+        $value = $value->__toArray();
+        $this->denormalize($class, $value);
       }
-      elseif (is_array($field)) {
-        $this->denormalize($field);
+      elseif ($value instanceof DateTime) {
+        $value = new MongoDate($value->format('U'));
+      }
+      elseif (is_array($value)) {
+        $this->denormalize($class, $value);
       }
     }
   }

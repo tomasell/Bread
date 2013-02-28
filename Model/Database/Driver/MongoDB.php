@@ -17,6 +17,7 @@ namespace Bread\Model\Database\Driver;
 
 use Bread;
 use Bread\Model;
+use Bread\Model\Database;
 use Bread\Model\Interfaces;
 use Bread\Promise;
 use DateTime;
@@ -33,46 +34,70 @@ class MongoDB implements Interfaces\Database {
     $this->link = $this->client->$database;
   }
 
-  public function store(Bread\Model $model) {
-    $collection = $this->collection(get_class($model));
-    $this->link->$collection->save($model);
-    return $model;
+  public function store(Bread\Model &$model) {
+    $class = get_class($model);
+    $collection = $this->collection($class);
+    $document = $model->attributes();
+    $this->denormalize($class, $document);
+    $this->link->$collection->update($model->key(), $document, array(
+      'upsert' => true, 'multiple' => false
+    ));
+    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
+      'unique' => true
+    ));
+    return $this->promise($model);
   }
 
   public function delete(Bread\Model $model) {
-  }
-
-  public function purge($class) {
+    $collection = $this->collection($model);
+    return $this->promise($this->link->$collection->remove($model->key()));
   }
 
   public function count($class, $search = array(), $options = array()) {
-    return $this->cursor($class, $search, $options)->count(true);
+    return $this->promise($this->cursor($class, $search, $options)->count(true));
   }
 
   public function first($class, $search = array(), $options = array()) {
     $options['limit'] = 1;
-    return $this->fetch($class, $search, $options)->then(function ($fetch) {
-      return Promise\When::resolve(array_shift($fetch));
-    });
+    return $this->fetch($class, $search, $options)->then('current');
   }
 
   public function fetch($class, $search = array(), $options = array()) {
     $models = array();
     $documents = $this->cursor($class, $search, $options);
     foreach ($documents as $document) {
-      $this->normalizeDocument($document);
+      $this->normalize($document);
       $model = new $class($document);
       $models[] = $model;
     }
-    return Promise\When::resolve($models);
+    return $this->promise($models);
+  }
+
+  public function purge($class) {
+    $collection = $this->collection($class);
+    $this->link->$collection->drop();
+    return $this->promise();
+  }
+
+  protected function promise($result = true) {
+    return Promise\When::resolve($result);
+  }
+
+  protected function collection($class) {
+    $class = is_object($class) ? get_class($class) : $class;
+    return $class;
+  }
+
+  protected function className($collection) {
+    return $collection;
   }
 
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
-    $search = $this->normalizeSearch(array(
-      $search
-    ))[0];
-    $cursor = $this->link->$collection->find($search);
+    $this->denormalize($class, $search);
+    $cursor = $this->link->$collection->find($search, array(
+      '_id' => false
+    ));
     foreach ($options as $key => $option) {
       switch ($key) {
       case 'skip':
@@ -86,69 +111,7 @@ class MongoDB implements Interfaces\Database {
     return $cursor;
   }
 
-  protected function normalizeSearch($search) {
-    foreach ($search as &$conditions) {
-      foreach ($conditions as $attribute => &$condition) {
-        switch ($attribute) {
-        case '$and':
-        case '$or':
-        case '$nor':
-          $condition = $this->normalizeSearch($condition);
-          continue 2;
-        default:
-          if (is_array($condition)) {
-            $c = array();
-            foreach ($condition as $k => &$v) {
-              switch ($k) {
-              case '$in':
-              case '$nin':
-              case '$all':
-                array_walk($v, array(
-                  $this, 'formatValue'
-                ));
-                continue 2;
-              case '$not':
-                $v = $this->normalizeSearch(array(
-                  $v
-                ))[0];
-                continue 2;
-              }
-              $this->formatValue($v);
-            }
-          }
-          else {
-            $this->formatValue($condition);
-          }
-        }
-      }
-    }
-    return $search;
-  }
-
-  protected function formatValue(&$value) {
-    if (is_subclass_of($value, 'Bread\Model')) {
-      $v = (array) new Database\Reference($value);
-    }
-    elseif ($value instanceof DateTime) {
-      $value = new MongoDate($value->format('U'));
-    }
-    elseif (is_array($value)) {
-      foreach ($value as &$v) {
-        $this->formatValue($v);
-      }
-    }
-  }
-
-  protected function collection($class) {
-    $class = is_object($class) ? get_class($class) : $class;
-    return str_replace(NS, '.', $class);
-  }
-
-  protected function className($collection) {
-    return str_replace('.', NS, $collection);
-  }
-
-  protected function normalizeDocument(&$document) {
+  protected function normalize(&$document) {
     foreach ($document as &$field) {
       if ($field instanceof MongoId) {
         $field = (string) $field;
@@ -159,21 +122,52 @@ class MongoDB implements Interfaces\Database {
       elseif ($field instanceof MongoBinData) {
         $field = (string) $field;
       }
-      elseif (MongoDBRef::isRef($field)) {
-        $field = MongoDBRef::get($this->link, $field);
-        $this->normalizeDocument($field);
-      }
       elseif (Database\Reference::is($field)) {
-        Database\Reference::fetch($field)->then(function ($model) use (
-          $field) {
+        Database\Reference::fetch($field)->then(function ($model) use (&$field) {
           $field = $model;
         });
       }
+      elseif (MongoDBRef::isRef($field)) {
+        $field = MongoDBRef::get($this->link, $field);
+        $this->normalize($field);
+      }
       elseif (is_array($field)) {
-        $this->normalizeDocument($field);
-        if ((bool) count(array_filter(array_keys($field), 'is_string'))) {
-          $field = (object) $field;
-        }
+        $this->normalize($field);
+      }
+    }
+  }
+
+  protected function denormalize($class, &$document) {
+    foreach ($document as $field => &$value) {
+      $attribute = $field;
+      $explode = explode('.', $attribute);
+      $field = array_shift($explode);
+      if ($explode) {
+        unset($document[$attribute]);
+        $type = $class::get("attributes.$field.type");
+        $type::fetch(array(
+          implode('.', $explode) => $value
+        ))->then(function ($models) use (&$value) {
+          $value = array(
+            '$in' => $models
+          );
+        });
+        $document[$field] = &$value;
+      }
+      if ($value instanceof Bread\Model) {
+        $value->store();
+        $reference = new Database\Reference($value);
+        $value = (array) $reference;
+      }
+      elseif ($value instanceof Bread\Model\Attribute) {
+        $value = $value->__toArray();
+        $this->denormalize($class, $value);
+      }
+      elseif ($value instanceof DateTime) {
+        $value = new MongoDate($value->format('U'));
+      }
+      elseif (is_array($value)) {
+        $this->denormalize($class, $value);
       }
     }
   }

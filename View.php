@@ -15,6 +15,8 @@
 
 namespace Bread;
 
-abstract class View {
+use Bread\Core;
+
+abstract class View extends Core\Dough {
 
 }

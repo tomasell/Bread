@@ -15,11 +15,12 @@
 
 namespace Bread;
 
+use Bread\Core;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
 use Bread\Promise;
 
-abstract class Controller {
+abstract class Controller extends Core\Dough {
   protected $request;
   protected $response;
   protected $deferred;
@@ -38,6 +39,7 @@ abstract class Controller {
       $this->data->progress($data);
     })->body->on('end', function($data) {
       $this->data->resolve($this->request->body->contents());
+      $this->resolver->resolve();
     });
   }
 }

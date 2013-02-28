@@ -13,15 +13,17 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Interfaces;
+namespace Bread\L10n\Message;
 
-use Bread;
+use Bread\L10n\Localized;
 
-interface Database {
-  public function store(Bread\Model &$model);
-  public function delete(Bread\Model $model);
-  public function count($class, $search = array(), $options = array());
-  public function first($class, $search = array(), $options = array());
-  public function fetch($class, $search = array(), $options = array());
-  public function purge($class);
+class Model extends Localized {
+  protected $domain = 'default';
+  protected $msgid;
+  protected $msgstr;
+  
+  public static $key = array('domain', 'msgid');
+  protected static $localized = array(
+    'msgstr' => true
+  );
 }

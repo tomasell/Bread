@@ -19,11 +19,14 @@ use Bread\L10n\Localized;
 
 class Model extends Localized {
   protected $domain = 'default';
+  protected $locale;
   protected $msgid;
+  protected $msgid_plural;
   protected $msgstr;
-  
+
   public static $key = array('domain', 'msgid');
-  protected static $localized = array(
-    'msgstr' => true
+  protected static $attributes = array(
+    'locale' => array('type' => 'Bread\L10n\Locale\Model'),
+    'msgstr' => array('multiple' => true)
   );
 }

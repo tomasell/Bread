@@ -77,23 +77,23 @@ class MySQL implements Interfaces\Database {
       foreach ($tables as $table) {
         $values = array_intersect_key($fields, array_flip($this->columns($table)));
         $columns = array_keys($values);
-        $placeholders = $this->placeholders($values, $table);
+        $placeholders = $this->placeholders($values, $table, $class);
         $queries = array();
         $update = array();
         foreach ($values as $column => &$value) {
-          if (is_array($value)) {
+          if ($class::get("attributes.$column.multiple")) {
             $_columns = array_merge($class::$key, array(
               '_', $column
             ));
             $__columns = array_flip($_columns);
-            $_placeholders = $this->placeholders($__columns, $table);
+            $_placeholders = $this->placeholders($__columns, $table, $class);
             $_update = array(
               "`$column` = VALUES(`$column`)"
             );
             $query = "INSERT INTO `$table` (`" . implode('`, `', $_columns)
               . "`) VALUES (" . implode(', ', $_placeholders)
               . ") ON DUPLICATE KEY UPDATE " . implode(', ', $_update);
-            foreach ($value as $k => $v) {
+            foreach ((array) $value as $k => $v) {
               $this->query($query, array_merge($model->key(), array(
                 $k, $v
               )));
@@ -190,11 +190,15 @@ class MySQL implements Interfaces\Database {
       $search
     ));
     $options = $this->options($options);
-    $table = $this->tableName($class);
-    $tables = implode('`, `', $this->tablesFor($class));
-    $key = implode("`, `$table`.`", $class::$key);
-    $query = "SELECT `{$table}`.`{$key}` FROM `{$tables}` WHERE {$where} "
-      . "GROUP BY `{$table}`.`{$key}` {$options}";
+    $tables = $this->tablesFor($class);
+    $table = array_shift($tables);
+    $key = implode('`, `', $class::$key);
+    $joins = $tables ? "LEFT JOIN `"
+        . implode("` USING (`$key`) LEFT JOIN `", $tables) . "` USING (`$key`)"
+      : '';
+    $projection = implode("`, `$table`.`", $class::$key);
+    $query = "SELECT `{$table}`.`{$projection}` FROM `{$table}` {$joins} "
+      . "WHERE {$where} GROUP BY `{$table}`.`{$projection}` {$options}";
     return $this->query($query);
   }
 
@@ -276,8 +280,8 @@ class MySQL implements Interfaces\Database {
     }
   }
 
-  protected function normalizeSearch($class, $conditions = array(), $logic = '$and',
-    $op = '=') {
+  protected function normalizeSearch($class, $conditions = array(),
+    $logic = '$and', $op = '=') {
     $where = array();
     foreach ($conditions as $search) {
       $w = array();
@@ -285,10 +289,12 @@ class MySQL implements Interfaces\Database {
         switch ($attribute) {
         case '$and':
         case '$or':
-          $where[] = "(" . $this->normalizeSearch($class, $condition, $attribute) . ")";
+          $where[] = "("
+            . $this->normalizeSearch($class, $condition, $attribute) . ")";
           continue 2;
         case '$nor':
-          $where[] = "NOT (" . $this->normalizeSearch($class, $condition, '$or') . ")";
+          $where[] = "NOT ("
+            . $this->normalizeSearch($class, $condition, '$or') . ")";
           continue 2;
         default:
           $explode = explode('.', $attribute);
@@ -420,13 +426,16 @@ class MySQL implements Interfaces\Database {
     return implode(' ', $return);
   }
 
-  protected function placeholders(&$columns, $table) {
+  protected function placeholders(&$columns, $table, $class) {
     $placeholders = array();
     foreach ($columns as $column => $value) {
       if (is_array($value)) {
         continue;
       }
       if (is_null($value) || trim($value) === '') {
+        if ($class::get("attributes.$column.multiple")) {
+          continue;
+        }
         $placeholders[] = "NULL";
         unset($columns[$column]);
       }

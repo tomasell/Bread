@@ -27,6 +27,7 @@ class Form extends Node {
   public function __call($type, $arguments) {
     $name = array_shift($arguments);
     $options = array_merge(array(
+      'id' => uniqid($name),
       'label' => null,
       'required' => true,
       'multiple' => false
@@ -53,6 +54,7 @@ class Form extends Node {
     }
     if ($label) {
       $label = $this->document->create('label', $label);
+      $label->for = $options['id'];
       switch ($type) {
       case 'radio':
       case 'checkbox':
@@ -64,6 +66,7 @@ class Form extends Node {
         $controlGroup->prepend($label);
       }
     }
+    $input->id = $options['id'];
     $input->attr('required', $required);
     return $input;
   }

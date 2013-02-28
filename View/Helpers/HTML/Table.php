@@ -24,19 +24,19 @@ class Table extends Node {
   public function __construct(Page $page, $columns = array()) {
     parent::__construct($page, 'table');
     $this->addClass('table');
-    $this->thead = $this->append('<thead></thead>')->append('<tr></tr>');
-    $this->tbody = $this->append('<tbody></tbody>');
-    $this->tfoot = $this->append('<tfoot></tfoot>');
+    $this->thead = $this->append('thead')->append('tr');
+    $this->tbody = $this->append('tbody');
+    $this->tfoot = $this->append('tfoot');
     foreach ($columns as $column) {
-      $this->thead->append('<th></th>')->text($column);
+      $this->thead->append('th')->text($column);
     }
   }
   
   public function row() {
-    return $this->tbody->append('<tr></tr>');
+    return $this->tbody->append('tr');
   }
   
   public function cell(Node $row, $content) {
-    return $row->append('<td></td>')->text($content);
+    return $row->append('td')->text($content);
   }
 }

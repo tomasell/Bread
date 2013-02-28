@@ -28,10 +28,10 @@ class Page extends DOM\Document {
     }
     else {
       $this->root = new Node($this, $this->root);
-      $this->head = $this->root->append('<head></head>');
-      $this->charset = $this->head->append('<meta charset="utf-8"/>');
-      $this->title = $this->head->append('<title></title>');
-      $this->body = $this->root->append('<body></body>');
+      $this->head = $this->root->append('head');
+      $this->charset = $this->head->append('meta')->charset = 'utf-8';
+      $this->title = $this->head->append('title');
+      $this->body = $this->root->append('body');
     }
   }
   

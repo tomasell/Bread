@@ -186,7 +186,7 @@ class Node implements Interfaces\Node {
           if (true === $value) {
             $value = $attribute;
           }
-          $node->setAttribute($attribute, $value);
+          $node->$attribute = $value;
         }
       }
     }

@@ -72,11 +72,11 @@ abstract class Model extends Core\Dough implements JsonSerializable {
   }
 
   public function store() {
-    static::database()->store($this);
+    return static::database()->store($this);
   }
 
   public function delete() {
-    static::database()->delete($this);
+    return static::database()->delete($this);
   }
 
   public static function count($search = array(), $options = array()) {

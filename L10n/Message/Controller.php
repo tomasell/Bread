@@ -21,7 +21,7 @@ use Bread\L10n\Locale\Controller as Locale;
 class Controller extends Bread\Controller {
   const DEFAULT_DOMAIN = 'default';
 
-  public function localize($domain, $msgid) {
+  public static function localize($domain, $msgid) {
     $arguments = func_get_args();
     $domain = array_shift($arguments);
     $msgid = array_shift($args);

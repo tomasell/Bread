@@ -15,6 +15,7 @@
 
 namespace Bread\L10n\Database;
 
+use Bread;
 use Bread\Model\Interfaces;
 use Bread\Promise;
 

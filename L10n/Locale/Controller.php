@@ -24,8 +24,7 @@ class Controller extends Bread\Controller {
 
   protected static $configuration = array(
     'default' => array(
-      'code' => 'en-us',
-      'name' => 'English'
+      'code' => 'en_US.UTF-8'
     )
   );
 
@@ -42,5 +41,6 @@ class Controller extends Bread\Controller {
     if (!isset(static::$current)) {
       static::$current = static::$default;
     }
+    setlocale(LC_ALL, static::$current->code);
   }
 }

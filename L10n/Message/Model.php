@@ -18,19 +18,27 @@ namespace Bread\L10n\Message;
 use Bread;
 use Bread\L10n\Localized;
 
-define('gettext', 'gettext://default' . BREAD_PRIVATE . DS . 'locale');
-
 class Model extends Bread\Model {
-  protected $domain = 'default';
   protected $locale;
+  protected $domain;
   protected $msgid;
   protected $msgid_plural;
-  protected $msgstr;
+  protected $msgstr = array();
 
-  public static $key = array('domain', 'msgid');
-  protected static $attributes = array(
-    'locale' => array('type' => 'Bread\L10n\Locale\Model'),
-    'msgstr' => array('multiple' => true)
+  public static $key = array(
+    'domain', 'msgid'
   );
-  protected static $configuration = array('database' => array('url' => gettext));
+  
+  protected static $attributes = array(
+    'locale' => array(
+      'type' => 'Bread\L10n\Locale\Model'
+    ),
+    'msgstr' => array(
+      'multiple' => true
+    )
+  );
+  
+  public function __toString() {
+    return (string) current($this->msgstr);
+  }
 }

@@ -13,13 +13,13 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\L10n\Database;
+namespace Bread\L10n\Gettext;
 
 use Bread;
 use Bread\Model\Interfaces;
 use Bread\Promise;
 
-class Gettext implements Interfaces\Database {
+class Database implements Interfaces\Database {
   protected $directory;
 
   protected $categories = array(
@@ -34,6 +34,7 @@ class Gettext implements Interfaces\Database {
 
   public function __construct($url) {
     $this->directory = parse_url($url, PHP_URL_PATH);
+    bindtextdomain('default', realpath($this->directory));
   }
 
   public function store(Bread\Model &$model) {
@@ -70,7 +71,7 @@ class Gettext implements Interfaces\Database {
         'domain' => $domain,
         'msgid' => $msgid,
         'msgstr' => array(
-          $n => dcngettext($domain, $msgid, $msgid_plural, $n, $category)
+          dcngettext($domain, $msgid, $msgid_plural, $n, $category)
         )
       ));
     return Promise\When::resolve($model);

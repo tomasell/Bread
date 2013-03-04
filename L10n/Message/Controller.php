@@ -22,6 +22,7 @@ use Bread\Networking\HTTP\Response;
 
 class Controller extends Bread\Controller {
   const DEFAULT_DOMAIN = 'default';
+  const DEFAULT_PLURAL = 'nplurals=2;plural=n!=1;';
 
   protected $domain;
 
@@ -29,45 +30,53 @@ class Controller extends Bread\Controller {
     $domain = self::DEFAULT_DOMAIN) {
     parent::__construct($request, $response);
     $this->domain = $domain;
+    Locale::configure();
   }
 
   public function __invoke($msgid) {
     $arguments = func_get_args();
-    array_unshift($arguments, $this->domain);
-    return call_user_func_array(array(
-      $this, 'localize'
-    ), $arguments);
-  }
-
-  public function localize($domain, $msgid) {
-    $arguments = func_get_args();
-    $domain = array_shift($arguments);
     $msgid = array_shift($arguments);
-    $search = array(
-      'locale' => Locale::$current,
-      'category' => LC_MESSAGES,
-      'domain' => $domain,
-      'msgid' => $msgid
-    );
-    return Model::first($search)
-      ->then(
-        function ($message) use ($arguments) {
-          return vsprintf($message, $arguments);
-        },
-        function () use ($search) {
-          $message = new Model($search);
-        });
-  }
-
-  public function t($msgid) {
-    $arguments = func_get_args();
-    array_unshift($arguments, $this->domain);
+    array_unshift($arguments, $this->domain, $msgid, null, 1);
     return call_user_func_array(array(
         $this, 'localize'
       ), $arguments);
   }
 
-  public function tp($singular, $plural, $n) {
+  public function localize($domain, $msgid, $msgid_plural = null, $n = 1) {
+    $arguments = func_get_args();
+    $domain = array_shift($arguments);
+    $msgid = array_shift($arguments);
+    $msgid_plural = array_shift($arguments);
+    $n = array_shift($arguments);
+    $search = array(
+      'locale' => Locale::$current,
+      'category' => LC_MESSAGES,
+      'domain' => $domain,
+      'msgid' => $msgid,
+      'msgid_plural' => $msgid_plural,
+      'n' => $n
+    );
+    return Model::first($search)
+      ->then(
+        function ($message) use ($arguments, $n) {
+          $plural = $this->plural(Locale::$current->plural, $n);
+          return vsprintf($message->msgstr[$plural], $arguments);
+        },
+        function () use ($search, $arguments) {
+          return vsprintf($search['msgid'], $arguments);
+        });
+  }
+
+  public function t($msgid) {
+    $arguments = func_get_args();
+    $msgid = array_shift($arguments);
+    array_unshift($arguments, $this->domain, $msgid, null, 1);
+    return call_user_func_array(array(
+        $this, 'localize'
+      ), $arguments);
+  }
+
+  public function tp($singular, $plural, $n = 1) {
     $arguments = func_get_args();
     array_unshift($arguments, $this->domain);
     return call_user_func_array(array(
@@ -76,14 +85,22 @@ class Controller extends Bread\Controller {
   }
 
   public function dt($domain, $msgid) {
+    $arguments = func_get_args();
+    $domain = array_shift($arguments);
+    $msgid = array_shift($arguments);
+    array_unshift($arguments, $domain, $msgid, null, 1);
+    return call_user_func_array(array(
+        $this, 'localize'
+      ), $arguments);
+  }
+
+  public function dtp($domain, $singular, $plural, $n = 1) {
     return call_user_func_array(array(
         $this, 'localize'
       ), func_get_args());
   }
 
-  public function dtp($domain, $singular, $plural, $n) {
-    return call_user_func_array(array(
-        $this, 'localize'
-      ), func_get_args());
+  protected function plural($plural, $n) {
+    return 0;
   }
 }

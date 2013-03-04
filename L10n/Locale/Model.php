@@ -20,6 +20,7 @@ use Bread\L10n\Localized;
 class Model extends Localized {
   protected $code;
   protected $name;
+  protected $plural = 'nplurals=2; plural=(n != 1)';
 
   public static $key = array('code');
   protected static $localized = array(

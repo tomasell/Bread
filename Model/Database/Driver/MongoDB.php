@@ -66,11 +66,11 @@ class MongoDB implements Interfaces\Database {
     $models = array();
     $documents = $this->cursor($class, $search, $options);
     foreach ($documents as $document) {
-      $this->normalize($document);
+      $this->normalize($class, $document);
       $model = new $class($document);
       $models[] = $model;
     }
-    return $this->promise($models);
+    return empty($models) ? Promise\When::reject() : $this->promise($models);
   }
 
   public function purge($class) {
@@ -111,28 +111,31 @@ class MongoDB implements Interfaces\Database {
     return $cursor;
   }
 
-  protected function normalize(&$document) {
-    foreach ($document as &$field) {
-      if ($field instanceof MongoId) {
-        $field = (string) $field;
+  protected function normalize($class, &$document) {
+    foreach ($document as $field => &$value) {
+      if ($value instanceof MongoId) {
+        $value = (string) $value;
       }
-      elseif ($field instanceof MongoDate) {
-        $field = new DateTime('@' . $field->sec);
+      elseif ($value instanceof MongoDate) {
+        $value = new DateTime('@' . $value->sec);
       }
-      elseif ($field instanceof MongoBinData) {
-        $field = (string) $field;
+      elseif ($value instanceof MongoBinData) {
+        $value = (string) $value;
       }
-      elseif (Database\Reference::is($field)) {
-        Database\Reference::fetch($field)->then(function ($model) use (&$field) {
-          $field = $model;
+      elseif ($class::get("attributes.$field.multiple")) {
+        $value = (array) $value;
+      }
+      elseif (Database\Reference::is($value)) {
+        Database\Reference::fetch($value)->then(function ($model) use (&$value) {
+          $value = $model;
         });
       }
-      elseif (MongoDBRef::isRef($field)) {
-        $field = MongoDBRef::get($this->link, $field);
-        $this->normalize($field);
+      elseif (MongoDBRef::isRef($value)) {
+        $value = MongoDBRef::get($this->link, $value);
+        $this->normalize($class, $value);
       }
-      elseif (is_array($field)) {
-        $this->normalize($field);
+      elseif (is_array($value)) {
+        $this->normalize($class, $value);
       }
     }
   }

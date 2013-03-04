@@ -76,6 +76,10 @@ if (!defined('BREAD_PUBLIC')) {
   define('BREAD_PUBLIC', BREAD_ROOT . DS . "public");
 }
 
+if (!defined('BREAD_GETTEXT')) {
+  define('BREAD_GETTEXT', "gettext://localhost" . BREAD_ROOT . DS . "locale");
+}
+
 foreach (array(
   new ClassLoader(__NAMESPACE__, BREAD_BASE),
   new ClassLoader(null, BREAD_APPLICATION),

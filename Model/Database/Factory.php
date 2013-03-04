@@ -20,7 +20,7 @@ use Bread, Exception;
 class Factory {
   protected static $configuration = array(
     'drivers' => array(
-      'gettext' => 'Bread\L10n\Database\Gettext',
+      'gettext' => 'Bread\L10n\Gettext\Database',
       'mongodb' => 'Bread\Model\Database\Driver\MongoDB',
       'couchdb' => 'Bread\Model\Database\Driver\CouchDB',
       'mysql' => 'Bread\Model\Database\Driver\MySQL'

@@ -15,9 +15,12 @@
 
 namespace Bread\L10n\Message;
 
+use Bread;
 use Bread\L10n\Localized;
 
-class Model extends Localized {
+define('gettext', 'gettext://default' . BREAD_PRIVATE . DS . 'locale');
+
+class Model extends Bread\Model {
   protected $domain = 'default';
   protected $locale;
   protected $msgid;
@@ -29,4 +32,5 @@ class Model extends Localized {
     'locale' => array('type' => 'Bread\L10n\Locale\Model'),
     'msgstr' => array('multiple' => true)
   );
+  protected static $configuration = array('database' => array('url' => gettext));
 }

@@ -35,8 +35,8 @@ class Page extends DOM\Document {
     }
   }
   
-  public function __invoke($name) {
-    return new Node($this, parent::__invoke($name));
+  public function __invoke($name, $context = null) {
+    return new Node($this, parent::__invoke($name, $context));
   }
 
   public function create($name, $value = null, $attributes = array()) {
@@ -68,7 +68,7 @@ class Page extends DOM\Document {
     return new Node($this, $element);
   }
   
-  public function load($filename) {
+  public function load($filename, $options = LIBXML_NOXMLDECL) {
     libxml_use_internal_errors(true);
     $this->document->loadHTMLFile($filename);
     $this->xpath = new DOMXPath($this->document);

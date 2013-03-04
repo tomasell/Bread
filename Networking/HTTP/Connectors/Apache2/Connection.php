@@ -44,7 +44,7 @@ class Connection extends Stream implements Networking\Interfaces\Connection {
     ));
   }
 
-  public function handleData($stream, $loop) {
+  public function handleData($stream) {
     $data = fread($stream, $this->bufferSize);
     $this->emit('data', array(
         $data, $this

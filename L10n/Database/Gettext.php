@@ -33,11 +33,12 @@ class Gettext implements Interfaces\Database {
   );
 
   public function __construct($url) {
-    $this->directory = parse_url($url, PHP_URL_PATH) ? : BREAD_PRIVATE . DS . 'locale';
+    $this->directory = parse_url($url, PHP_URL_PATH);
   }
 
   public function store(Bread\Model &$model) {
-    $po = $this->directory . DS . $model->locale->code . DS . $this->categories[$model->category] . DS . $model->domain . ".po";
+    $po = $this->directory . DS . $model->locale->code . DS
+      . $this->categories[$model->category] . DS . $model->domain . ".po";
     if (!file_put_contents($po, (string) $model, FILE_APPEND)) {
       return Promise\When::reject();
     }
@@ -53,16 +54,26 @@ class Gettext implements Interfaces\Database {
   }
 
   public function first($class, $search = array(), $options = array()) {
-    $search = array_merge(array(
-      'domain' => 'default',
-      'category' => LC_MESSAGES,
-      'locale' => setlocale(LC_MESSAGES, 0),
-      'msgid' => null,
-      'msgid_plural' => null,
-      ''
-    ), $search);
+    $search = array_merge(
+      array(
+        'locale' => setlocale(LC_ALL, 0),
+        'domain' => 'default',
+        'msgid' => null,
+        'msgid_plural' => null,
+        'n' => 1,
+        'category' => LC_ALL
+      ), $search);
     extract($search);
-    return Promise\When::resolve(dcgettext($domain, $msgid, $category));
+    $model = new $class(
+      array(
+        'locale' => $locale,
+        'domain' => $domain,
+        'msgid' => $msgid,
+        'msgstr' => array(
+          $n => dcngettext($domain, $msgid, $msgid_plural, $n, $category)
+        )
+      ));
+    return Promise\When::resolve($model);
   }
 
   public function fetch($class, $search = array(), $options = array()) {

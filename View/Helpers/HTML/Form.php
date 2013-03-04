@@ -26,35 +26,29 @@ class Form extends Node {
 
   public function __call($type, $arguments) {
     $name = array_shift($arguments);
-    $options = array_merge(array(
+    $label = array_shift($arguments);
+    $attributes = array_merge(array(
       'id' => uniqid($name),
-      'label' => null,
+      'name' => $name,
       'required' => true,
-      'multiple' => false
-    ), array_shift($arguments));
-    extract($options);
+      'multiple' => false,
+      'placeholder' => null
+    ), (array) array_shift($arguments));
     $controlGroup = $this->append('div.control-group');
     $controls = $controlGroup->append('div.controls');
     switch ($type) {
     case 'select':
-      $input = $controls->append('select')->attr(array(
-        'name' => $name,
-        'multiple' => $multiple
-      ));
+      $input = $controls->append('select');
       break;
     case 'textarea':
-      $input = $controls->append('textarea')->attr(array(
-        'name' => $name
-      ));
+      $input = $controls->append('textarea');
       break;
     default:
-      $input = $controls->append('input')->attr(array(
-        'name' => $name, 'type' => $type
-      ));
+      $input = $controls->append('input')->attr('type', $type);
     }
     if ($label) {
       $label = $this->document->create('label', $label);
-      $label->for = $options['id'];
+      $label->for = $attributes['id'];
       switch ($type) {
       case 'radio':
       case 'checkbox':
@@ -66,23 +60,19 @@ class Form extends Node {
         $controlGroup->prepend($label);
       }
     }
-    $input->id = $options['id'];
-    $input->attr('required', $required);
+    $input->attr($attributes);
     return $input;
   }
 
   public function actions($actions = array()) {
     $formActions = $this->append('div.form-actions');
     foreach ($actions as $type => $action) {
-      list($type, $class) = explode('.', $type)
-        + array(
-          null, null
-        );
       $formActions->append('button', $action)->attr(array(
-        'type' => $type, 'class' => $class ? "btn btn-$class" : "btn"
+        'type' => $type, 'class' => 'btn'
       ));
     }
   }
+
   public function text($text) {
     return $this->__call(__FUNCTION__, func_get_args());
   }

@@ -17,53 +17,73 @@ namespace Bread\L10n\Message;
 
 use Bread;
 use Bread\L10n\Locale\Controller as Locale;
+use Bread\Networking\HTTP\Request;
+use Bread\Networking\HTTP\Response;
 
 class Controller extends Bread\Controller {
   const DEFAULT_DOMAIN = 'default';
 
-  public static function localize($domain, $msgid) {
+  protected $domain;
+
+  public function __construct(Request $request, Response $response,
+    $domain = self::DEFAULT_DOMAIN) {
+    parent::__construct($request, $response);
+    $this->domain = $domain;
+  }
+
+  public function __invoke($msgid) {
+    $arguments = func_get_args();
+    array_unshift($arguments, $this->domain);
+    return call_user_func_array(array(
+      $this, 'localize'
+    ), $arguments);
+  }
+
+  public function localize($domain, $msgid) {
     $arguments = func_get_args();
     $domain = array_shift($arguments);
-    $msgid = array_shift($args);
+    $msgid = array_shift($arguments);
     $search = array(
       'locale' => Locale::$current,
       'category' => LC_MESSAGES,
       'domain' => $domain,
       'msgid' => $msgid
     );
-    Model::first($search)->then(function($message) use ($arguments) {
-      return vsprintf($message->msgstr, $arguments);
-    }, function() use ($search) {
-      $message = new Model($search);
-    });
-
+    return Model::first($search)
+      ->then(
+        function ($message) use ($arguments) {
+          return vsprintf($message, $arguments);
+        },
+        function () use ($search) {
+          $message = new Model($search);
+        });
   }
 
   public function t($msgid) {
     $arguments = func_get_args();
-    array_unshift($arguments, self::DEFAULT_DOMAIN);
+    array_unshift($arguments, $this->domain);
     return call_user_func_array(array(
-      $this, 'localize'
-    ), $arguments);
+        $this, 'localize'
+      ), $arguments);
   }
 
   public function tp($singular, $plural, $n) {
     $arguments = func_get_args();
-    array_unshift($arguments, self::DEFAULT_DOMAIN);
+    array_unshift($arguments, $this->domain);
     return call_user_func_array(array(
         $this, 'localize'
-    ), $arguments);
+      ), $arguments);
   }
 
   public function dt($domain, $msgid) {
     return call_user_func_array(array(
-      $this, 'localize'
-    ), func_get_args());
+        $this, 'localize'
+      ), func_get_args());
   }
 
   public function dtp($domain, $singular, $plural, $n) {
     return call_user_func_array(array(
         $this, 'localize'
-    ), func_get_args());
+      ), func_get_args());
   }
 }

@@ -47,33 +47,6 @@ class Parser {
     $this->defaultActions = json_decode('{"6":[2,1]}', true);
     
     $this->lexer = new Lexer();
-
-    //lexer
-    $this->rules = array(
-      "/^(?:\\s+)/",
-      "/^(?:[0-9]+(\\.[0-9]+)?\\b)/",
-      "/^(?:n\\b)/",
-      "/^(?:\\|\\|)/",
-      "/^(?:&&)/",
-      "/^(?:\\?)/",
-      "/^(?::)/",
-      "/^(?:<=)/",
-      "/^(?:>=)/",
-      "/^(?:<)/",
-      "/^(?:>)/",
-      "/^(?:!=)/",
-      "/^(?:==)/",
-      "/^(?:%)/",
-      "/^(?:\\()/",
-      "/^(?:\\))/",
-      "/^(?:$)/",
-      "/^(?:.)/"
-    );
-    $this->conditions = json_decode(
-      '{"INITIAL":{"rules":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],"inclusive":true}}',
-      true);
-
-    $this->options = json_decode('{}', true);
   }
 
   public function trace() {

@@ -23,82 +23,79 @@ use Bread\L10n\Gettext\PluralForms;
 
 class Controller extends Bread\Controller {
   const DEFAULT_DOMAIN = 'default';
-  const DEFAULT_PLURAL = 'nplurals=2;plural=n!=1;';
 
   protected $domain;
 
   public function __construct(Request $request, Response $response,
     $domain = self::DEFAULT_DOMAIN) {
+    Locale::configure();
     parent::__construct($request, $response);
     $this->domain = $domain;
-    Locale::configure();
+    if (Model::get('gettext')) {
+      bindtextdomain($this->domain, BREAD_ROOT . DS . 'locale');
+    }
   }
 
-  public function __invoke($msgid) {
-    $arguments = func_get_args();
-    $msgid = array_shift($arguments);
-    array_unshift($arguments, $this->domain, $msgid, null, 1);
-    return call_user_func_array(array(
-      $this, 'localize'
-    ), $arguments);
-  }
-
-  public function localize($domain, $msgid, $msgid_plural = null, $n = 1) {
-    $arguments = func_get_args();
-    $domain = array_shift($arguments);
-    $msgid = array_shift($arguments);
-    $msgid_plural = array_shift($arguments);
-    $n = array_shift($arguments);
-    $search = array(
-      'locale' => Locale::$current,
-      'category' => LC_MESSAGES,
-      'domain' => $domain,
-      'msgid' => $msgid,
-      'msgid_plural' => $msgid_plural
-    );
-    $plural = $this->plural(Locale::$current->plural, $n);
-    return Model::first($search)->then(null, function () use ($search) {
-      return new Model(array(
-        'msgstr' => array(
-          $search['msgid'], $search['msgid_plural']
-        )
-      ));
-    })->then(function ($message) use ($arguments, $plural) {
-      return vsprintf($message->msgstr[$plural], $arguments);
-    });
+  public function __invoke() {
+    return call_user_func_array(array($this, 't'), func_get_args());
   }
 
   public function t($msgid) {
     $arguments = func_get_args();
     $msgid = array_shift($arguments);
-    array_unshift($arguments, $this->domain, $msgid, null, 1);
+    array_unshift($arguments, $msgid, null, 1, '');
     return call_user_func_array(array(
       $this, 'localize'
     ), $arguments);
   }
-
-  public function tp($singular, $plural, $n = 1) {
-    $arguments = func_get_args();
-    array_unshift($arguments, $this->domain);
+  
+  public function p($msgid, $msgid_plural, $n) {
+    $arguments = array_slice(func_get_args(), 3);
+    array_unshift($arguments, $msgid, $msgid_plural, $n, '');
     return call_user_func_array(array(
-      $this, 'localize'
+        $this, 'localize'
     ), $arguments);
   }
 
-  public function dt($domain, $msgid) {
-    $arguments = func_get_args();
-    $domain = array_shift($arguments);
-    $msgid = array_shift($arguments);
-    array_unshift($arguments, $domain, $msgid, null, 1);
-    return call_user_func_array(array(
-      $this, 'localize'
-    ), $arguments);
-  }
-
-  public function dtp($domain, $singular, $plural, $n = 1) {
-    return call_user_func_array(array(
-      $this, 'localize'
-    ), func_get_args());
+  public function localize($msgid, $msgid_plural = null, $n = 1,
+    $msgctxt = '') {
+    $arguments = array_slice(func_get_args(), 4);
+    if (Model::get('gettext')) {
+      if ($msgctxt) {
+        $msgctxt = "{$msgctxt}\004{$msgid}";
+        $msgstr = dcngettext($this->domain, $msgctxt, $msgid_plural, $n, LC_MESSAGES);
+        if ($msgstr == $msgctxt || $msgstr == $msgid_plural) {
+          $msgstr = ($n == 1 ? $msgid : $msgid_plural);
+        }
+      }
+      else {
+        $msgstr = dcngettext($this->domain, $msgid, $msgid_plural, $n, LC_MESSAGES);
+      }
+      return Bread\Promise\When::resolve(vsprintf($msgstr, $arguments));
+    }
+    $plural = $this->plural(Locale::$current->plural, $n);
+    $search = array(
+      'locale' => Locale::$current,
+      'domain' => $this->domain,
+      'msgctxt' => $msgctxt,
+      'msgid' => $msgid,
+      'msgid_plural' => $msgid_plural
+    );
+    return Model::first($search)->then(null, function () use ($search) {
+      $message = new Model(array(
+        'locale' => Locale::$default,
+        'domain' => $search['domain'],
+        'msgctxt' => $search['msgctxt'],
+        'msgid' => $search['msgid'],
+        'msgid_plural' => $search['msgid_plural'],
+        'msgstr' => array(
+          $search['msgid'], $search['msgid_plural']
+        )
+      ));
+      return $message->store();
+    })->then(function ($message) use ($arguments, $plural) {
+      return vsprintf($message->msgstr[$plural], $arguments);
+    });
   }
 
   protected function plural($plural, $n) {

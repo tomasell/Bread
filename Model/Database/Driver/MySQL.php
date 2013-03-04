@@ -82,6 +82,8 @@ class MySQL implements Interfaces\Database {
         $update = array();
         foreach ($values as $column => &$value) {
           if ($class::get("attributes.$column.multiple")) {
+            $key = $model->key();
+            $this->denormalize($key);
             $_columns = array_merge($class::$key, array(
               '_', $column
             ));
@@ -94,7 +96,7 @@ class MySQL implements Interfaces\Database {
               . "`) VALUES (" . implode(', ', $_placeholders)
               . ") ON DUPLICATE KEY UPDATE " . implode(', ', $_update);
             foreach ((array) $value as $k => $v) {
-              $this->query($query, array_merge($model->key(), array(
+              $this->query($query, array_merge($key, array(
                 $k, $v
               )));
             }
@@ -176,7 +178,7 @@ class MySQL implements Interfaces\Database {
         $models[] = new $class($attributes);
       }
     }
-    return Promise\When::resolve($models);
+    return empty($models) ? Promise\When::reject() : Promise\When::resolve($models);
   }
 
   public function purge($class) {
@@ -273,6 +275,7 @@ class MySQL implements Interfaces\Database {
     $this->denormalizeValue($v);
     if (is_string($v)) {
       $v = "'" . $this->link->real_escape_string($v) . "'";
+      $v = str_replace('%', '%%', $v);
     }
     elseif (is_null($v)) {
       $op = "IS";
@@ -432,7 +435,7 @@ class MySQL implements Interfaces\Database {
       if (is_array($value)) {
         continue;
       }
-      if (is_null($value) || trim($value) === '') {
+      if (is_null($value)) {
         if ($class::get("attributes.$column.multiple")) {
           continue;
         }

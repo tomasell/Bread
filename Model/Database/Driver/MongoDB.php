@@ -39,7 +39,9 @@ class MongoDB implements Interfaces\Database {
     $collection = $this->collection($class);
     $document = $model->attributes();
     $this->denormalize($class, $document);
-    $this->link->$collection->update($model->key(), $document, array(
+    $key = $model->key();
+    $this->denormalize($class, $key);
+    $this->link->$collection->update($key, $document, array(
       'upsert' => true, 'multiple' => false
     ));
     $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(

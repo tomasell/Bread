@@ -15,11 +15,13 @@
 
 namespace Bread\L10n\Locale;
 
+use Bread;
 use Bread\L10n\Localized;
 
-class Model extends Localized {
+class Model extends Bread\Model {
   protected $code;
   protected $name;
+  protected $plural = 'nplurals=2; plural=(n != 1)';
 
   public static $key = array('code');
   protected static $localized = array(

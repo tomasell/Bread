@@ -29,7 +29,7 @@ class Factory {
   public static function create($url) {
     $scheme = parse_url($url, PHP_URL_SCHEME);
     if (!isset(static::$configuration['drivers'][$scheme])) {
-      throw new Exception('Driver for {$scheme} not found.');
+      throw new Exception("Driver for {$scheme} not found.");
     }
     $Driver = static::$configuration['drivers'][$scheme];
     return new $Driver($url);

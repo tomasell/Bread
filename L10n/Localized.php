@@ -39,7 +39,6 @@ abstract class Localized extends Bread\Model {
       if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
         $this->$attribute = new Attribute();
       }
-      var_dump($value);
       if (is_array($value)) {
         foreach ($value as $v) {
           $this->validate($attribute, $v['$val']);

@@ -15,15 +15,31 @@
 
 namespace Bread\L10n\Message;
 
+use Bread;
 use Bread\L10n\Localized;
 
-class Model extends Localized {
-  protected $domain = 'default';
+class Model extends Bread\Model {
+  protected $locale;
+  protected $domain;
+  protected $msgctxt;
   protected $msgid;
-  protected $msgstr;
-  
-  public static $key = array('domain', 'msgid');
-  protected static $localized = array(
-    'msgstr' => true
+  protected $msgid_plural;
+  protected $msgstr = array();
+
+  public static $key = array(
+    'locale', 'domain', 'msgctxt', 'msgid'
   );
+  
+  protected static $attributes = array(
+    'locale' => array(
+      'type' => 'Bread\L10n\Locale\Model'
+    ),
+    'msgstr' => array(
+      'multiple' => true
+    )
+  );
+  
+  public function __toString() {
+    return (string) current($this->msgstr);
+  }
 }

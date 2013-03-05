@@ -29,6 +29,7 @@ abstract class Controller extends Core\Dough {
   protected $data;
   
   public function __construct(Request $request, Response $response) {
+    parent::__construct();
     $this->request = $request;
     $this->response = $response;
     $this->deferred = new Promise\Deferred();

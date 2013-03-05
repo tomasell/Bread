@@ -154,7 +154,7 @@ abstract class Dough {
    * @param string $key
    * @param mixed $value
    */
-  public static function set($key = null, $value = null) {
+  public static function _set($key = null, $value = null) {
     $self = get_called_class();
     $self::configure();
     if (is_array($key)) {

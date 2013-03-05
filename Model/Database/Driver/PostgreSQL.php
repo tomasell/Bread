@@ -13,18 +13,10 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread;
+namespace Bread\Model\Database\Driver;
 
-use Bread\Core;
-use Bread\Networking\HTTP\Request;
-use Bread\Networking\HTTP\Response;
+use Bread\Model\Interfaces;
 
-abstract class View extends Core\Dough {
-  protected $request;
-  protected $response;
-  
-  public function __construct(Request $request, Response $response) {
-    $this->request = $request;
-    $this->response = $response;
-  }
+class PostgreSQL implements Interfaces\Database {
+
 }

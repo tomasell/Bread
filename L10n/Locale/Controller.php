@@ -22,10 +22,19 @@ class Controller extends Bread\Controller {
   public static $default;
   public static $current;
 
+  protected static $categories = array(
+      LC_CTYPE => 'LC_CTYPE',
+      LC_NUMERIC => 'LC_NUMERIC',
+      LC_TIME => 'LC_TIME',
+      LC_COLLATE => 'LC_COLLATE',
+      LC_MONETARY => 'LC_MONETARY',
+      LC_MESSAGES => 'LC_MESSAGES',
+      LC_ALL => 'LC_ALL'
+  );
+  
   protected static $configuration = array(
     'default' => array(
-      'code' => 'en-us',
-      'name' => 'English'
+      'code' => 'en_US.UTF-8'
     )
   );
 
@@ -36,11 +45,18 @@ class Controller extends Bread\Controller {
     parent::configure($configuration);
     if (!isset(static::$default)) {
       Model::first(static::get('default'))->then(function ($default) {
-        static::$default = $default ? : new Model(static::get('default'));
+        static::$default = $default;
+      }, function () {
+        static::$default = new Model(static::get('default'));
       });
     }
-    if (!isset(static::$current)) {
-      static::$current = static::$default;
-    }
+    static::set(static::$default);
+  }
+  
+  public static function set($locale, $category = LC_ALL) {
+    $categoryString = static::$categories[$category];
+    putenv("{$categoryString}={$locale->code}");
+    setlocale($category, $locale->code);
+    static::$current = $locale;
   }
 }

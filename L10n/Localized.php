@@ -21,15 +21,19 @@ use SplObjectStorage;
 
 abstract class Localized extends Bread\Model {
   protected static $localized = array();
-  
+
   public function __construct($attributes = array()) {
     foreach (static::$localized as $attribute) {
       $this->$attribute = new SplObjectStorage();
     }
     foreach ($attributes as $attribute => $value) {
       if (in_array($attribute, static::$localized)) {
-        $this->$attribute->attach($value['_tag'], $value['_val']);
-        unset($attributes[$attribute]);
+        if (is_array($value) && is_array(current($value))) {
+          foreach ($value as $v) {
+            $this->$attribute->attach($v['_tag'], $v['_val']);
+          }
+          unset($attributes[$attribute]);
+        }
       }
     }
     parent::__construct($attributes);
@@ -37,28 +41,24 @@ abstract class Localized extends Bread\Model {
 
   public function __get($attribute) {
     if (in_array($attribute, static::$localized)) {
+      var_dump(Locale::$current);
       return $this->$attribute->offsetGet(Locale::$current);
     }
-    else {
-      return parent::__get($attribute);
-    }
+    return parent::__get($attribute);
   }
-  
+
   public function __set($attribute, $value) {
     if (in_array($attribute, static::$localized)) {
       $this->$attribute->attach(Locale::$current, $value);
     }
     else {
-      return parent::__set($attribute, $value);
+      parent::__set($attribute, $value);
     }
   }
 
   public static function configure($configuration = array()) {
     Locale::configure();
     $configuration = parent::configure($configuration);
-    foreach (static::$localized as $attribute) {
-      static::cfg("attributes.$attribute.tag", 'Bread\L10n\Locale\Model');
-    }
     return static::configuration();
   }
 }

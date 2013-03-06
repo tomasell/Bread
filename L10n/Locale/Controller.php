@@ -34,7 +34,7 @@ class Controller extends Bread\Controller {
   
   protected static $configuration = array(
     'default' => array(
-      'code' => 'en_US.UTF-8'
+      'lang' => 'en-us'
     )
   );
 

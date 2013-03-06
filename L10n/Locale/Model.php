@@ -16,7 +16,6 @@
 namespace Bread\L10n\Locale;
 
 use Bread;
-use Bread\L10n\Localized;
 
 class Model extends Bread\Model {
   protected $lang;

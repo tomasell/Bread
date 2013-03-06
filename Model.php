@@ -62,13 +62,18 @@ abstract class Model extends Core\Dough implements JsonSerializable {
     return $this->attributes();
   }
 
-  public function key() {
-    return $this->attributes(static::$key);
+  public function key($tag = false) {
+    $key = $this->attributes(static::$key);
+    return $tag ? implode(';',
+        array_map(
+          function ($key, $val) {
+            return "$key-$val";
+          }, array_keys($key), $key)) : $key;
   }
 
   public function attributes($attributes = null) {
-    return $attributes ? array_intersect_key(get_object_vars($this), array_flip($attributes))
-      : get_object_vars($this);
+    return $attributes ? array_intersect_key(get_object_vars($this),
+        array_flip($attributes)) : get_object_vars($this);
   }
 
   public function store() {
@@ -110,7 +115,8 @@ abstract class Model extends Core\Dough implements JsonSerializable {
     $self::$cache = Cache\Factory::create();
     //$self::$cache->clear();
     if (!isset(self::$database[$self])) {
-      self::$database[$self] = Model\Database\Factory::create($self::get('database.url'));
+      self::$database[$self] = Model\Database\Factory::create(
+        $self::get('database.url'));
     }
     return $configuration;
   }
@@ -125,22 +131,21 @@ abstract class Model extends Core\Dough implements JsonSerializable {
       return self::$database[$self];
     }
   }
-  
+
   protected static function call($method, $search = array(), $options = array()) {
     static::configure();
     $self = get_called_class();
-    $key = implode('::', array(
-        $self,
-        $method,
-        md5(json_encode($search + $options))
-    ));
-    return static::$cache->get($key)->then(null, function ($key) use ($search,
-        $options, $self, $method) {
-      return $self::database()->$method($self, $search, $options)->then(function (
-          $result) use ($key, $self) {
-        $self::$cache->set($key, $result);
-        return $result;
+    $key = implode('::',
+      array(
+        $self, $method, md5(json_encode($search + $options))
+      ));
+    return static::$cache->get($key)->then(null,
+      function ($key) use ($search, $options, $self, $method) {
+        return $self::database()->$method($self, $search, $options)->then(
+          function ($result) use ($key, $self) {
+            $self::$cache->set($key, $result);
+            return $result;
+          });
       });
-    });
   }
 }

@@ -81,10 +81,15 @@ class MySQL implements Interfaces\Database {
         $values = array_intersect_key($fields,
           array_flip($this->columns($table)));
         $columns = array_keys($values);
-        $placeholders = $this->placeholders($values, $table, $class);
         $queries = array();
         $update = array();
         foreach ($values as $column => $value) {
+          if ($class::get("attributes.$column.tag")) {
+            $columns[] = '_tag';
+            $values['_tag'] = $value['_tag'];
+            $values[$column] = $value['_val'];
+            $placeholders = $this->placeholders($values, $table, $class);
+          }
           if ($class::get("attributes.$column.multiple")) {
             $columns[] = '_';
             $_columns = array_flip($columns);
@@ -113,6 +118,8 @@ class MySQL implements Interfaces\Database {
           }
           $update[] = "`$column` = VALUES(`$column`)";
         }
+        $placeholders = $this->placeholders($values, $table, $class);
+        
         $query = "INSERT INTO `$table` (`" . implode('`, `', $columns)
           . "`) VALUES ";
         $query .= "(" . implode(', ', $placeholders)

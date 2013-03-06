@@ -20,7 +20,7 @@ use Bread\Model;
 use Bread\Model\Database;
 use Bread\Model\Interfaces;
 use Bread\Promise;
-use DateTime;
+use DateTime, SplObjectStorage;
 
 use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
 
@@ -152,7 +152,7 @@ class MongoDB implements Interfaces\Database {
         $type = $class::get("attributes.$field.type");
         $type::fetch(array(
           implode('.', $explode) => $value
-        ))->then(function ($models) use (&$value) {
+        ))->then(function ($models) use (&$value) { // TODO Async!
           $value = array(
             '$in' => $models
           );
@@ -164,10 +164,20 @@ class MongoDB implements Interfaces\Database {
         $reference = new Database\Reference($value);
         $value = (array) $reference;
       }
+      elseif ($value instanceof SplObjectStorage) {
+        $storage = array();
+        foreach ($value as $v) {
+          $storage[] = array(
+            '_tag' => $value->current(),
+            '_val' => $value->getInfo()
+          );
+        }
+        $value = $storage;
+      }
       elseif ($value instanceof DateTime) {
         $value = new MongoDate($value->format('U'));
       }
-      elseif (is_array($value)) {
+      if (is_array($value)) {
         $this->denormalize($class, $value);
       }
     }

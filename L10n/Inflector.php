@@ -19,10 +19,6 @@ namespace Bread\L10n;
  * Pluralize and singularize English words.
  *
  * Inflector pluralizes and singularizes English nouns.
- * Used by Cake's naming conventions throughout the framework.
- *
- * @package       cake.libs
- * @link          http://book.cakephp.org/view/1478/Inflector
  */
 class Inflector {
 
@@ -1690,13 +1686,12 @@ class Inflector {
    */
   public static function tableize($className) {
     if (!($result = self::_cache(__FUNCTION__, $className))) {
-      /*$parts = explode(NS, $className);
-       $_className = array_pop($parts);
+      $parts = explode(NS, $className);
+      $_className = array_pop($parts);
       $_result = Inflector::pluralize(Inflector::underscore($_className));
       $parts = array_map('strtolower', $parts);
       $parts[] = $_result;
-      $result = implode('_', $parts);*/
-      $result = Inflector::pluralize(Inflector::underscore($className));
+      $result = implode('_', $parts);
       self::_cache(__FUNCTION__, $className, $result);
     }
     return $result;
@@ -1712,13 +1707,12 @@ class Inflector {
    */
   public static function classify($tableName) {
     if (!($result = self::_cache(__FUNCTION__, $tableName))) {
-      //$parts = explode('_', $tableName);
-      //$_tableName = array_pop($parts);
-      //$_result = Inflector::camelize(Inflector::singularize($_tableName));
-      //$parts = array_map('ucfirst', $parts);
-      //$parts[] = $_result;
-      //$result = implode(NS, $parts);
-      $result = Inflector::camelize(Inflector::singularize($tableName));
+      $parts = explode('_', $tableName);
+      $_tableName = array_pop($parts);
+      $_result = Inflector::camelize(Inflector::singularize($_tableName));
+      $parts = array_map('ucfirst', $parts);
+      $parts[] = $_result;
+      $result = implode(NS, $parts);
       self::_cache(__FUNCTION__, $tableName, $result);
     }
     return $result;

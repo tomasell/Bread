@@ -164,10 +164,6 @@ class MongoDB implements Interfaces\Database {
         $reference = new Database\Reference($value);
         $value = (array) $reference;
       }
-      elseif ($value instanceof Bread\Model\Attribute) {
-        $value = $value->__toArray();
-        $this->denormalize($class, $value);
-      }
       elseif ($value instanceof DateTime) {
         $value = new MongoDate($value->format('U'));
       }

@@ -16,18 +16,29 @@
 namespace Bread;
 
 use Bread\Core;
+use Bread\Promise;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
-use Bread\Promise;
 
+/**
+ * Application controller class for organization of business logic.
+ */
 abstract class Controller extends Core\Dough {
+  /**
+   * @var Request $request The HTTP request to control
+   */
   protected $request;
+
+  /**
+   * @var Response $response The HTTP response to generate
+   */
   protected $response;
+
   protected $deferred;
   protected $resolver;
   protected $promise;
   protected $data;
-  
+
   public function __construct(Request $request, Response $response) {
     parent::__construct();
     $this->request = $request;
@@ -36,9 +47,9 @@ abstract class Controller extends Core\Dough {
     $this->resolver = $this->deferred->resolver();
     $this->promise = $this->deferred->promise();
     $this->data = new Promise\Deferred();
-    $this->request->on('data', function($data) {
+    $this->request->on('data', function ($data) {
       $this->data->progress($data);
-    })->body->on('end', function($data) {
+    })->body->on('end', function ($data) {
       $this->data->resolve($this->request->body->contents());
       $this->resolver->resolve();
     });

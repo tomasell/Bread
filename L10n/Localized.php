@@ -16,17 +16,27 @@
 namespace Bread\L10n;
 
 use Bread;
-use Bread\Model\Attribute;
 use Bread\L10n\Locale\Controller as Locale;
+use SplObjectStorage;
 
 abstract class Localized extends Bread\Model {
   protected static $localized = array();
   
+  public function __construct($attributes = array()) {
+    foreach (static::$localized as $attribute) {
+      $this->$attribute = new SplObjectStorage();
+    }
+    foreach ($attributes as $attribute => $value) {
+      if (in_array($attribute, static::$localized)) {
+        $this->$attribute->attach($value['_tag'], $value['_val']);
+        unset($attributes[$attribute]);
+      }
+    }
+    parent::__construct($attributes);
+  }
+
   public function __get($attribute) {
     if (in_array($attribute, static::$localized)) {
-      if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
-        $this->$attribute = new Attribute();
-      }
       return $this->$attribute->offsetGet(Locale::$current);
     }
     else {
@@ -36,27 +46,19 @@ abstract class Localized extends Bread\Model {
   
   public function __set($attribute, $value) {
     if (in_array($attribute, static::$localized)) {
-      if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
-        $this->$attribute = new Attribute();
-      }
-      if (is_array($value)) {
-        foreach ($value as $v) {
-          $this->validate($attribute, $v['$val']);
-          $this->$attribute->attach($v['$key'], $v['$val']);
-        }
-      }
-      else {
-        $this->validate($attribute, $value);
-        $this->$attribute->attach(Locale::$current, $value);
-      }
+      $this->$attribute->attach(Locale::$current, $value);
     }
     else {
-      parent::__set($attribute, $value);
+      return parent::__set($attribute, $value);
     }
   }
-  
+
   public static function configure($configuration = array()) {
     Locale::configure();
-    return parent::configure($configuration);
+    $configuration = parent::configure($configuration);
+    foreach (static::$localized as $attribute) {
+      static::cfg("attributes.$attribute.tag", 'Bread\L10n\Locale\Model');
+    }
+    return static::configuration();
   }
 }

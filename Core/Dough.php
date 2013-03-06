@@ -48,7 +48,7 @@ abstract class Dough {
    *
    * @var array
    */
-  private static $configuration = array();
+  protected static $configuration = array();
 
   /**
    * Class constructor
@@ -81,9 +81,9 @@ abstract class Dough {
       $userConfiguration = array();
       if ($parent = get_parent_class($self)) {
         $parentConfiguration = $parent::configure();
-      }
-      if (isset($self::$configuration)) {
-        $staticConfiguration = $self::$configuration;
+        if ($self::$configuration !== $parent::$configuration) {
+          $staticConfiguration = $self::$configuration;
+        }
       }
       if (is_dir(BREAD_CONFIGURATION)) {
         if (self::CACHE_FAILURE
@@ -154,9 +154,8 @@ abstract class Dough {
    * @param string $key
    * @param mixed $value
    */
-  public static function _set($key = null, $value = null) {
+  public static function cfg($key = null, $value = null) {
     $self = get_called_class();
-    $self::configure();
     if (is_array($key)) {
       return self::$_configurations[$self] = array_replace_recursive(self::$_configurations[$self], $key);
     }

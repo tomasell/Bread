@@ -19,11 +19,11 @@ use Bread;
 use Bread\L10n\Localized;
 
 class Model extends Bread\Model {
-  protected $code;
+  protected $lang;
   protected $name;
   protected $plural = 'nplurals=2; plural=(n != 1)';
 
-  public static $key = array('code');
+  public static $key = array('lang');
   protected static $localized = array(
     'name'
   );

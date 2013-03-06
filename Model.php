@@ -108,7 +108,7 @@ abstract class Model extends Core\Dough implements JsonSerializable {
     $configuration['attributes'] = $self::$attributes;
     $configuration = parent::configure($configuration);
     $self::$cache = Cache\Factory::create();
-    $self::$cache->clear();
+    //$self::$cache->clear();
     if (!isset(self::$database[$self])) {
       self::$database[$self] = Model\Database\Factory::create($self::get('database.url'));
     }

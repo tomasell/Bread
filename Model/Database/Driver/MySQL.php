@@ -43,8 +43,7 @@ class MySQL implements Interfaces\Database {
       'path' => null
     ), parse_url($url));
     $this->database = ltrim($conn['path'], '/');
-    if (!$this->link = new mysqli($conn['host'], $conn['user'], $conn['pass'],
-      null, $conn['port'])) {
+    if (!$this->link = new mysqli($conn['host'], $conn['user'], $conn['pass'], null, $conn['port'])) {
       throw new Exception('Cannot connect MySQL driver to ' . $conn['host']);
     }
     $this->link->set_charset('utf8');
@@ -73,7 +72,7 @@ class MySQL implements Interfaces\Database {
     $this->link->autocommit(false);
     try {
       $fields = $model->attributes();
-      $this->denormalize($fields);
+      $this->denormalize($fields, $class);
       foreach ($tables as $table) {
         $values = array_intersect_key($fields, array_flip($this->columns($table)));
         $columns = array_keys($values);
@@ -83,7 +82,7 @@ class MySQL implements Interfaces\Database {
         foreach ($values as $column => &$value) {
           if ($class::get("attributes.$column.multiple")) {
             $key = $model->key();
-            $this->denormalize($key);
+            $this->denormalize($key, $class);
             $_columns = array_merge($class::$key, array(
               '_', $column
             ));
@@ -157,7 +156,9 @@ class MySQL implements Interfaces\Database {
       $where = $this->normalizeSearch($class, array(
         $result
       ));
-      $query = "SELECT * FROM `{$table}` WHERE {$where}";
+      $projection = $this->projection($table);
+      $query = "SELECT $projection FROM `{$table}` WHERE {$where}";
+      var_dump($query);
       foreach ($this->query($query) as $row) {
         $attributes = array();
         $properties = array_merge($class::get("attributes"), $row);
@@ -167,7 +168,9 @@ class MySQL implements Interfaces\Database {
             $where = $this->normalizeSearch($class, array(
               $result
             ));
-            foreach ($this->query("SELECT `_`, `{$attribute}` FROM `{$table}_{$attribute}` WHERE {$where}") as $r) {
+            $_table = "{$table}_{$attribute}";
+            $projection = $this->projectionFunction($attribute, $this->type($_table, $attribute));
+            foreach ($this->query("SELECT `_`, {$projection} FROM `{$_table}` WHERE {$where}") as $r) {
               $multiple[$r['_']] = $r[$attribute];
             }
             $value = $multiple;
@@ -178,13 +181,34 @@ class MySQL implements Interfaces\Database {
         $models[] = new $class($attributes);
       }
     }
-    return empty($models) ? Promise\When::reject() : Promise\When::resolve($models);
+    return empty($models) ? Promise\When::reject()
+      : Promise\When::resolve($models);
   }
 
   public function purge($class) {
     $table = $this->tableName($class);
     $this->query("TRUNCATE TABLE `{$table}`");
     return Promise\When::resolve();
+  }
+
+  protected function projection($table) {
+    $projection = array();
+    $describe = $this->describe($table);
+    foreach ($describe['fields'] as $field => $description) {
+      $projection[] = $this->projectionFunction($field, $description['type']);
+    }
+    return implode(', ', $projection);
+  }
+
+  protected function projectionFunction($field, $type) {
+    switch ($type) {
+    case 'point':
+    case 'polygon':
+    case 'geometry':
+      return "AsText(`$field`) AS `$field`";
+    default:
+      return "`$field`";
+    }
   }
 
   protected function select($class, $search = array(), $options = array()) {
@@ -194,6 +218,7 @@ class MySQL implements Interfaces\Database {
     $options = $this->options($options);
     $tables = $this->tablesFor($class);
     $table = array_shift($tables);
+    $projection = $this->projection($table);
     $key = implode('`, `', $class::$key);
     $joins = $tables ? "LEFT JOIN `"
         . implode("` USING (`$key`) LEFT JOIN `", $tables) . "` USING (`$key`)"
@@ -204,21 +229,22 @@ class MySQL implements Interfaces\Database {
     return $this->query($query);
   }
 
-  protected function denormalize(&$document) {
-    foreach ($document as &$field) {
-      if (is_array($field)) {
-        foreach ($field as &$v) {
-          $this->denormalizeValue($v);
+  protected function denormalize(&$document, $class) {
+    foreach ($document as $field => &$value) {
+      if ($class::get("attributes.$field.type") != 'polygon'
+        && is_array($value)) {
+        foreach ($value as &$v) {
+          $this->denormalizeValue($v, $field, $class);
         }
         continue;
       }
-      elseif ($field) {
-        $this->denormalizeValue($field);
+      elseif ($value) {
+        $this->denormalizeValue($value, $field, $class);
       }
     }
   }
 
-  protected function denormalizeValue(&$value) {
+  protected function denormalizeValue(&$value, $field, $class) {
     if ($value instanceof Bread\Model) {
       $value->store();
       $reference = new Database\Reference($value);
@@ -227,11 +253,28 @@ class MySQL implements Interfaces\Database {
     elseif ($value instanceof Bread\Model\Attribute) {
       $value = $value->__toArray();
       foreach ($value as &$v) {
-        $this->denormalizeValue($value);
+        $this->denormalizeValue($value, $field, $class);
       }
     }
     elseif ($value instanceof DateTime) {
       $value = $value->format(self::DATETIME_FORMAT);
+    }
+    elseif (strcasecmp($class::get("attributes.$field.type"), 'point') == 0) {
+      $value = "GEOMFROMTEXT('POINT(" . implode(" ", $value) . ")')";
+      return;
+    }
+    elseif (strcasecmp($class::get("attributes.$field.type"), 'polygon') == 0) {
+      $polygon = [];
+      foreach ($value as $point) {
+        $polygon[] = implode(" ", $point);
+      }
+      $polygon[] = $polygon[0];
+      $value = "GEOMFROMTEXT('POLYGON((" . implode(",", $polygon) . "))')";
+      return;
+    }
+    if (is_string($value)) {
+      $value = "'" . $this->link->real_escape_string($value) . "'";
+      $value = str_replace('%', '%%', $value);
     }
   }
 
@@ -263,6 +306,21 @@ class MySQL implements Interfaces\Database {
     case 'datetime-local':
       $value = new DateTime($value);
       break;
+    case 'point':
+      preg_match('/POINT\((\S+) (\S+)\)/', $value, $matches);
+      $value = array(
+        (double) $matches[1], (double) $matches[2]
+      );
+      break;
+    case 'polygon':
+      preg_match('/^POLYGON\((.+)\)$/', $value, $matches);
+      $value = array();
+      foreach (preg_split('/\),\(/', $matches[1]) as $linestring) {
+        foreach (preg_split('/,/', trim($linestring, '()')) as $point) {
+          $value[] = array_map('floatval', preg_split('/ /', $point));
+        }
+      }
+      break;
     }
     if (Database\Reference::is($value)) {
       Database\Reference::fetch($value)->then(function ($model) use (&$value) {
@@ -271,13 +329,9 @@ class MySQL implements Interfaces\Database {
     }
   }
 
-  protected function formatValue(&$v, &$op = '=') {
-    $this->denormalizeValue($v);
-    if (is_string($v)) {
-      $v = "'" . $this->link->real_escape_string($v) . "'";
-      $v = str_replace('%', '%%', $v);
-    }
-    elseif (is_null($v)) {
+  protected function formatValue(&$v, &$op = '=', $info = array()) {
+    $this->denormalizeValue($v, $info[0], $info[1]);
+    if (is_null($v)) {
       $op = "IS";
       $v = "NULL";
     }
@@ -319,12 +373,16 @@ class MySQL implements Interfaces\Database {
               case '$in':
                 array_walk($v, array(
                   $this, 'formatValue'
+                ), array(
+                  $attribute, $class
                 ));
                 $c[] = "`$attribute` IN (" . implode(" , ", $v) . ")";
                 continue 2;
               case '$nin':
                 array_walk($v, array(
                   $this, 'formatValue'
+                ), array(
+                  $attribute, $class
                 ));
                 $c[] = "`$attribute` NOT IN (" . implode(" , ", $v) . ")";
                 continue 2;
@@ -360,15 +418,56 @@ class MySQL implements Interfaces\Database {
                     $not
                   ));
                 continue 2;
+              case '$near':
+                //TODO
+                if(isset($condition['$maxDistance'])) {
+                  $maxDistance = $condition['$maxDistance'];
+                  var_dump($v, $maxDistance);
+                  unset($condition['$maxDistance']);
+                }
+                continue 2;
+              case '$nearSphere':
+              case '$within':
+                switch (key($v)) {
+                case '$box':
+                  $minx = $v[key($v)][0][0];
+                  $miny = $v[key($v)][0][1];
+                  $maxx = $v[key($v)][1][0];
+                  $maxy = $v[key($v)][1][1];
+                  $polygon = "($minx $miny,$maxx $miny,$maxx $maxy,$minx $maxy,$minx $miny)";
+                  break;
+                case '$center':
+                  $r = $v[key($v)][1];
+                  $minx = $v[key($v)][0][0] - $r / 2;
+                  $miny = $v[key($v)][0][1] - $r / 2;
+                  $maxx = $v[key($v)][0][0] + $r / 2;
+                  $maxy = $v[key($v)][0][1] + $r / 2;
+                  $polygon = "($minx $miny,$maxx $miny,$maxx $maxy,$minx $maxy,$minx $miny)";
+                  break;
+                case '$polygon':
+                  foreach ($v[key($v)] as $i=>$point) {
+                    $v[key($v)][$i]=implode(" ", $point);
+                  }
+                  $v[key($v)][]=$v[key($v)][0];
+                  $polygon = "(".implode("  ", $v[key($v)]).")";
+                  break;
+                }
+                $shape = "GeomFromText('Polygon($polygon)')";
+                $c[] = "Within($attribute,$shape)";
+                continue 2;
               }
-              $this->formatValue($v, $op);
+              $this->formatValue($v, $op, array(
+                $attribute, $class
+              ));
               $c[] = "`$attribute` $op $v";
               $op = '=';
             }
             $w[] = "(" . implode(" AND ", $c) . ")";
             continue 2;
           }
-          $this->formatValue($condition, $op);
+          $this->formatValue($condition, $op, array(
+            $attribute, $class
+          ));
           $w[] = "`$attribute` $op $condition";
           $op = '=';
         }
@@ -443,13 +542,7 @@ class MySQL implements Interfaces\Database {
         unset($columns[$column]);
       }
       else {
-        switch ($this->type($table, $column)) {
-        case 'int':
-          $placeholders[] = "%s";
-          break;
-        default:
-          $placeholders[] = "'%s'";
-        }
+        $placeholders[] = "%s";
       }
     }
     return $placeholders;
@@ -460,7 +553,7 @@ class MySQL implements Interfaces\Database {
       'primary' => array(), 'unique' => array(), 'indexes' => array()
     );
     $fields = array();
-    foreach ($this->tables("$table%") as $table) {
+    foreach ($this->tables($table) as $table) {
       $describe = $this->query("DESCRIBE `%s`", $table);
       foreach ($describe as $field) {
         $fields[$field['Field']] = array(
@@ -489,6 +582,7 @@ class MySQL implements Interfaces\Database {
 
   protected function type($table, $column) {
     $describe = $this->describe($table);
+
     return $describe['fields'][$column]['type'];
   }
 
@@ -530,7 +624,7 @@ class MySQL implements Interfaces\Database {
       }
       $table = $_table;
       $this->query("INSERT INTO `" . self::INDEX_TABLE
-        . "` VALUES ('%s', '%s')", $class, $table);
+        . "` VALUES ('%s', '%s')", $this->link->real_escape_string($class), $table);
     }
     $key = implode('`, `', $class::$key);
     if (!$this->tableExists($table)) {
@@ -578,7 +672,7 @@ class MySQL implements Interfaces\Database {
   protected function tableName($class) {
     $class = is_object($class) ? get_class($class) : $class;
     $query = "SELECT * FROM `" . self::INDEX_TABLE . "` WHERE `class` = '%s'";
-    $results = $this->query($query, $class);
+    $results = $this->query($query, $this->link->real_escape_string($class));
     $result = array_shift($results);
     if (isset($result['table'])) {
       return $result['table'];
@@ -620,6 +714,7 @@ class MySQL implements Interfaces\Database {
         : "`$column` ENUM($implode) $null $default,\n\t";
     }
     if ($type === 'number') {
+      $sign = null;
       if (is_numeric($min)) {
         $sign = ($min < 0) ? null : 'unsigned';
       }
@@ -648,6 +743,10 @@ class MySQL implements Interfaces\Database {
       return "`$column` LONGBLOB $null $default,\n\t";
     case 'checkbox':
       return "`$column` TINYINT(1) $null $default,\n\t";
+    case 'point':
+      return "`$column` POINT $null $default,\n\t";
+    case 'polygon':
+      return "`$column` POLYGON $null $default,\n\t";
     }
     return "`$column` VARCHAR(128) $null $default,\n\t";
   }
@@ -678,9 +777,6 @@ class MySQL implements Interfaces\Database {
     $query = array_shift($args);
     if (is_array(current($args))) {
       $args = array_shift($args);
-    }
-    foreach ($args as &$arg) {
-      $arg = $this->link->real_escape_string($arg);
     }
     $query = vsprintf($query, $args);
     $result = $this->link->query($query);

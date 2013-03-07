@@ -158,7 +158,6 @@ class MySQL implements Interfaces\Database {
       ));
       $projection = $this->projection($table);
       $query = "SELECT $projection FROM `{$table}` WHERE {$where}";
-      var_dump($query);
       foreach ($this->query($query) as $row) {
         $attributes = array();
         $properties = array_merge($class::get("attributes"), $row);
@@ -231,12 +230,10 @@ class MySQL implements Interfaces\Database {
 
   protected function denormalize(&$document, $class) {
     foreach ($document as $field => &$value) {
-      if ($class::get("attributes.$field.type") != 'polygon'
-        && is_array($value)) {
+      if ($class::get("attributes.$field.multiple")) {
         foreach ($value as &$v) {
-          $this->denormalizeValue($v, $field, $class);
+        	$this->denormalizeValue($v, $field, $class);
         }
-        continue;
       }
       elseif ($value) {
         $this->denormalizeValue($value, $field, $class);
@@ -418,15 +415,19 @@ class MySQL implements Interfaces\Database {
                     $not
                   ));
                 continue 2;
-              case '$near':
-                //TODO
-                if(isset($condition['$maxDistance'])) {
-                  $maxDistance = $condition['$maxDistance'];
-                  var_dump($v, $maxDistance);
-                  unset($condition['$maxDistance']);
-                }
+              case '$maxDistance':
+              case '$uniqueDocs':
                 continue 2;
-              case '$nearSphere':
+              case '$near':
+                $maxDistance = $condition['$maxDistance'];
+                $pointA = ($v[0] - $maxDistance) . " " . $v[1];
+                $pointB = $v[0] . " " . ($v[1] - $maxDistance);
+                $pointC = ($v[0] + $maxDistance) . " " . $v[1];
+                $pointD = $v[0] . " " . ($v[1] + $maxDistance);
+                $polygon = "($pointA,$pointB,$pointC,$pointD,$pointA)";
+                $shape = "GeomFromText('Polygon($polygon)')";
+                $c[] = "Within($attribute,$shape)";
+                continue 2;
               case '$within':
                 switch (key($v)) {
                 case '$box':
@@ -438,18 +439,18 @@ class MySQL implements Interfaces\Database {
                   break;
                 case '$center':
                   $r = $v[key($v)][1];
-                  $minx = $v[key($v)][0][0] - $r / 2;
-                  $miny = $v[key($v)][0][1] - $r / 2;
-                  $maxx = $v[key($v)][0][0] + $r / 2;
-                  $maxy = $v[key($v)][0][1] + $r / 2;
-                  $polygon = "($minx $miny,$maxx $miny,$maxx $maxy,$minx $maxy,$minx $miny)";
+                  $pointA = ($v[key($v)][0][0] - $r) . " " . $v[key($v)][0][1];
+                  $pointB = $v[key($v)][0][0] . " " . ($v[key($v)][0][1] - $r);
+                  $pointC = ($v[key($v)][0][0] + $r) . " " . $v[key($v)][0][1];
+                  $pointD = $v[key($v)][0][0] . " " . ($v[key($v)][0][1] + $r);
+                  $polygon = "($pointA,$pointB,$pointC,$pointD,$pointA)";
                   break;
                 case '$polygon':
-                  foreach ($v[key($v)] as $i=>$point) {
-                    $v[key($v)][$i]=implode(" ", $point);
+                  foreach ($v[key($v)] as $i => $point) {
+                    $v[key($v)][$i] = implode(" ", $point);
                   }
-                  $v[key($v)][]=$v[key($v)][0];
-                  $polygon = "(".implode("  ", $v[key($v)]).")";
+                  $v[key($v)][] = $v[key($v)][0];
+                  $polygon = "(" . implode("  ", $v[key($v)]) . ")";
                   break;
                 }
                 $shape = "GeomFromText('Polygon($polygon)')";

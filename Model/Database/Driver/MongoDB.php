@@ -44,9 +44,7 @@ class MongoDB implements Interfaces\Database {
     $this->link->$collection->update($key, $document, array(
       'upsert' => true, 'multiple' => false
     ));
-    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
-      'unique' => true
-    ));
+    $this->indexes($class);
     return $this->promise($model);
   }
 
@@ -173,6 +171,29 @@ class MongoDB implements Interfaces\Database {
       }
       elseif (is_array($value)) {
         $this->denormalize($class, $value);
+      }
+    }
+  }
+
+  protected function indexes($class) {
+    $collection = $this->collection($class);
+    $indexes = $this->link->$collection->getIndexInfo();
+    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
+      'unique' => true
+    ));
+    foreach ($class::get("attributes") as $field => $description) {
+      if (!isset($description['type'])) {
+        continue;
+      }
+      switch ($description['type']) {
+      case 'point':
+      case 'polygon':
+        foreach ($indexes as $index) {
+          if (!isset($index['key'][$field]))
+            $this->link->$collection->ensureIndex(array(
+              $field => "2d"
+            ));
+        }
       }
     }
   }

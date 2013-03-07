@@ -232,5 +232,5 @@ jp.sourceforge.pdt_tools.formatter.wrap_array_in_arguments=true
 jp.sourceforge.pdt_tools.formatter.wrap_before_binary_operator=true
 jp.sourceforge.pdt_tools.formatter.wrap_before_concat_operator=true
 jp.sourceforge.pdt_tools.formatter.wrap_outer_expressions_when_nested=true
-org.pdtextensions.core.ui.formatter_profile=_Bread
+org.pdtextensions.core.ui.formatter_profile=_'Bread'
 org.pdtextensions.core.ui.formatter_settings_version=1

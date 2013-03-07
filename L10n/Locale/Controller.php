@@ -31,7 +31,7 @@ class Controller extends Bread\Controller {
       LC_MESSAGES => 'LC_MESSAGES',
       LC_ALL => 'LC_ALL'
   );
-  
+
   protected static $configuration = array(
     'default' => array(
       'lang' => 'en-us'
@@ -52,11 +52,11 @@ class Controller extends Bread\Controller {
     }
     static::set(static::$default);
   }
-  
+
   public static function set($locale, $category = LC_ALL) {
     $categoryString = static::$categories[$category];
-    putenv("{$categoryString}={$locale->code}");
-    setlocale($category, $locale->code);
+    putenv("{$categoryString}={$locale->lang}");
+    setlocale($category, $locale->lang);
     static::$current = $locale;
   }
 }

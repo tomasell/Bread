@@ -23,6 +23,7 @@ use Bread\Promise;
 use DateTime, SplObjectStorage;
 
 use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
+use Bread\Model\Attribute;
 
 class MongoDB implements Interfaces\Database {
   protected $client;
@@ -41,12 +42,14 @@ class MongoDB implements Interfaces\Database {
     $this->denormalize($class, $document);
     $key = $model->key();
     $this->denormalize($class, $key);
-    $this->link->$collection->update($key, $document, array(
-      'upsert' => true, 'multiple' => false
-    ));
-    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
-      'unique' => true
-    ));
+    $this->link->$collection->update($key, $document,
+      array(
+        'upsert' => true, 'multiple' => false
+      ));
+    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1),
+      array(
+        'unique' => true
+      ));
     return $this->promise($model);
   }
 
@@ -97,9 +100,10 @@ class MongoDB implements Interfaces\Database {
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
     $this->denormalize($class, $search);
-    $cursor = $this->link->$collection->find($search, array(
-      '_id' => false
-    ));
+    $cursor = $this->link->$collection->find($search,
+      array(
+        '_id' => false
+      ));
     foreach ($options as $key => $option) {
       switch ($key) {
       case 'skip':
@@ -127,10 +131,16 @@ class MongoDB implements Interfaces\Database {
       elseif ($class::get("attributes.$field.multiple")) {
         $value = (array) $value;
       }
+      elseif (Model\Attribute::is($value)) {
+        $this->normalize($class, $value);
+        $value = new Model\Attribute($value);
+      }
       elseif (Database\Reference::is($value)) {
-        Database\Reference::fetch($value)->then(function ($model) use (&$value) {
-          $value = $model;
-        });
+        // TODO This is async!
+        Database\Reference::fetch($value)->then(
+          function ($model) use (&$value) {
+            $value = $model;
+          });
       }
       elseif (MongoDBRef::isRef($value)) {
         $value = MongoDBRef::get($this->link, $value);
@@ -150,13 +160,16 @@ class MongoDB implements Interfaces\Database {
       if ($explode) {
         unset($document[$attribute]);
         $type = $class::get("attributes.$field.type");
-        $type::fetch(array(
-          implode('.', $explode) => $value
-        ))->then(function ($models) use (&$value) { // TODO Async!
-          $value = array(
-            '$in' => $models
-          );
-        });
+        $type::fetch(
+          array(
+            implode('.', $explode) => $value
+          // TODO This is async!
+          ))->then(
+          function ($models) use (&$value) {
+            $value = array(
+              '$in' => $models
+            );
+          });
         $document[$field] = &$value;
       }
       if ($value instanceof Bread\Model) {
@@ -164,15 +177,8 @@ class MongoDB implements Interfaces\Database {
         $reference = new Database\Reference($value);
         $value = (array) $reference;
       }
-      elseif ($value instanceof SplObjectStorage) {
-        $storage = array();
-        foreach ($value as $v) {
-          $storage[] = array(
-            '_tag' => $value->current(),
-            '_val' => $value->getInfo()
-          );
-        }
-        $value = $storage;
+      elseif ($value instanceof Bread\Model\Attribute) {
+        $value = $value->__toArray();
       }
       elseif ($value instanceof DateTime) {
         $value = new MongoDate($value->format('U'));

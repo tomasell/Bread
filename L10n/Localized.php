@@ -16,32 +16,21 @@
 namespace Bread\L10n;
 
 use Bread;
+use Bread\Model\Attribute;
 use Bread\L10n\Locale\Controller as Locale;
-use SplObjectStorage;
 
 abstract class Localized extends Bread\Model {
   protected static $localized = array();
 
   public function __construct($attributes = array()) {
     foreach (static::$localized as $attribute) {
-      $this->$attribute = new SplObjectStorage();
-    }
-    foreach ($attributes as $attribute => $value) {
-      if (in_array($attribute, static::$localized)) {
-        if (is_array($value) && is_array(current($value))) {
-          foreach ($value as $v) {
-            $this->$attribute->attach($v['_tag'], $v['_val']);
-          }
-          unset($attributes[$attribute]);
-        }
-      }
+      $this->$attribute = new Attribute();
     }
     parent::__construct($attributes);
   }
 
   public function __get($attribute) {
     if (in_array($attribute, static::$localized)) {
-      var_dump(Locale::$current);
       return $this->$attribute->offsetGet(Locale::$current);
     }
     return parent::__get($attribute);
@@ -49,16 +38,17 @@ abstract class Localized extends Bread\Model {
 
   public function __set($attribute, $value) {
     if (in_array($attribute, static::$localized)) {
-      $this->$attribute->attach(Locale::$current, $value);
+      if ($value instanceof Attribute) {
+        $this->validate($attribute, $value->getInfo());
+        $this->$attribute = $value;
+      }
+      else {
+        $this->validate($attribute, $value);
+        $this->$attribute->attach(Locale::$current, $value);
+      }
     }
     else {
       parent::__set($attribute, $value);
     }
-  }
-
-  public static function configure($configuration = array()) {
-    Locale::configure();
-    $configuration = parent::configure($configuration);
-    return static::configuration();
   }
 }

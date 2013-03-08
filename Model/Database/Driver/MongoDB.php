@@ -20,10 +20,9 @@ use Bread\Model;
 use Bread\Model\Database;
 use Bread\Model\Interfaces;
 use Bread\Promise;
-use DateTime, SplObjectStorage;
+use DateTime;
 
 use MongoClient, MongoId, MongoDate, MongoRegex, MongoBinData, MongoDBRef;
-use Bread\Model\Attribute;
 
 class MongoDB implements Interfaces\Database {
   protected $client;
@@ -35,25 +34,21 @@ class MongoDB implements Interfaces\Database {
     $this->link = $this->client->$database;
   }
 
-  public function store(Bread\Model &$model) {
+  public function store(Model &$model) {
     $class = get_class($model);
     $collection = $this->collection($class);
     $document = $model->attributes();
     $this->denormalize($class, $document);
     $key = $model->key();
     $this->denormalize($class, $key);
-    $this->link->$collection->update($key, $document,
-      array(
-        'upsert' => true, 'multiple' => false
-      ));
-    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1),
-      array(
-        'unique' => true
-      ));
+    $this->link->$collection->update($key, $document, array(
+      'upsert' => true, 'multiple' => false
+    ));
+    $this->indexes($class);
     return $this->promise($model);
   }
 
-  public function delete(Bread\Model $model) {
+  public function delete(Model $model) {
     $collection = $this->collection($model);
     return $this->promise($this->link->$collection->remove($model->key()));
   }
@@ -99,19 +94,17 @@ class MongoDB implements Interfaces\Database {
 
   protected function cursor($class, $search = array(), $options = array()) {
     $collection = $this->collection($class);
-    $this->denormalize($class, $search);
-    $cursor = $this->link->$collection->find($search,
-      array(
-        '_id' => false
-      ));
+    $this->denormalizeSearch($class, $search);
+    $cursor = $this->link->$collection->find($search, array(
+      '_id' => false
+    ));
     foreach ($options as $key => $option) {
       switch ($key) {
+      case 'sort':
       case 'skip':
       case 'limit':
-      case 'sort':
-        if ($option) {
-          $cursor = $cursor->$key($option);
-        }
+        $option = is_array($option) ? array_map('intval', $option) : intval($option);
+        $cursor = $cursor->$key($option);
       }
     }
     return $cursor;
@@ -128,19 +121,15 @@ class MongoDB implements Interfaces\Database {
       elseif ($value instanceof MongoBinData) {
         $value = (string) $value;
       }
-      elseif ($class::get("attributes.$field.multiple")) {
-        $value = (array) $value;
-      }
       elseif (Model\Attribute::is($value)) {
         $this->normalize($class, $value);
         $value = new Model\Attribute($value);
       }
       elseif (Database\Reference::is($value)) {
         // TODO This is async!
-        Database\Reference::fetch($value)->then(
-          function ($model) use (&$value) {
-            $value = $model;
-          });
+        Database\Reference::fetch($value)->then(function ($model) use (&$value) {
+          $value = $model;
+        });
       }
       elseif (MongoDBRef::isRef($value)) {
         $value = MongoDBRef::get($this->link, $value);
@@ -154,30 +143,12 @@ class MongoDB implements Interfaces\Database {
 
   protected function denormalize($class, &$document) {
     foreach ($document as $field => &$value) {
-      $attribute = $field;
-      $explode = explode('.', $attribute);
-      $field = array_shift($explode);
-      if ($explode) {
-        unset($document[$attribute]);
-        $type = $class::get("attributes.$field.type");
-        $type::fetch(
-          array(
-            implode('.', $explode) => $value
-          // TODO This is async!
-          ))->then(
-          function ($models) use (&$value) {
-            $value = array(
-              '$in' => $models
-            );
-          });
-        $document[$field] = &$value;
-      }
-      if ($value instanceof Bread\Model) {
+      if ($value instanceof Model) {
         $value->store();
         $reference = new Database\Reference($value);
         $value = (array) $reference;
       }
-      elseif ($value instanceof Bread\Model\Attribute) {
+      elseif ($value instanceof Model\Attribute) {
         $value = $value->__toArray();
       }
       elseif ($value instanceof DateTime) {
@@ -185,6 +156,56 @@ class MongoDB implements Interfaces\Database {
       }
       if (is_array($value)) {
         $this->denormalize($class, $value);
+      }
+    }
+  }
+
+  protected function denormalizeSearch($class, &$search) {
+    foreach ($search as $field => &$condition) {
+      $attribute = $field;
+      $explode = explode('.', $attribute);
+      $field = array_shift($explode);
+      if ($explode && !in_array('_inf', $explode)) {
+        unset($search[$attribute]);
+        $type = $class::get("attributes.$field.type");
+        $type::fetch(array(
+          implode('.', $explode) => $value
+        // TODO This is async!
+        ))->then(function ($models) use (&$value) {
+          $value = array(
+            '$in' => $models
+          );
+        });
+        $search[$field] = &$value;
+      }
+      if ($class::get("attributes.$field.data")) {
+        unset($search[$field]);
+        $search["{$field}._inf"] = $condition;
+      }
+    }
+    $this->denormalize($class, $search);
+  }
+
+  protected function indexes($class) {
+    $collection = $this->collection($class);
+    $indexes = $this->link->$collection->getIndexInfo();
+    $this->link->$collection->ensureIndex(array_fill_keys($class::$key, 1), array(
+      'unique' => true
+    ));
+    foreach ($class::get('attributes') as $field => $description) {
+      if (!isset($description['type'])) {
+        continue;
+      }
+      switch ($description['type']) {
+      case 'point':
+      case 'polygon':
+        foreach ($indexes as $index) {
+          if (!isset($index['key'][$field])) {
+            $this->link->$collection->ensureIndex(array(
+              $field => '2d'
+            ));
+          }
+        }
       }
     }
   }

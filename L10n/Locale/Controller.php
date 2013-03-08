@@ -17,19 +17,20 @@ namespace Bread\L10n\Locale;
 
 use Bread;
 use Bread\L10n\Message;
+use Locale;
 
 class Controller extends Bread\Controller {
   public static $default;
   public static $current;
 
   protected static $categories = array(
-      LC_CTYPE => 'LC_CTYPE',
-      LC_NUMERIC => 'LC_NUMERIC',
-      LC_TIME => 'LC_TIME',
-      LC_COLLATE => 'LC_COLLATE',
-      LC_MONETARY => 'LC_MONETARY',
-      LC_MESSAGES => 'LC_MESSAGES',
-      LC_ALL => 'LC_ALL'
+    LC_CTYPE => 'LC_CTYPE',
+    LC_NUMERIC => 'LC_NUMERIC',
+    LC_TIME => 'LC_TIME',
+    LC_COLLATE => 'LC_COLLATE',
+    LC_MONETARY => 'LC_MONETARY',
+    LC_MESSAGES => 'LC_MESSAGES',
+    LC_ALL => 'LC_ALL'
   );
 
   protected static $configuration = array(
@@ -38,6 +39,18 @@ class Controller extends Bread\Controller {
     )
   );
 
+  public function __construct($request, $response) {
+    parent::__construct($request, $response);
+    Model::fetch()->then(function($locales) {
+      $locales = array_map(function($locale) {
+        return $locale->lang;
+      }, $locales);
+      $accept = Locale::acceptFromHttp($this->request->headers['Accept-Language']);
+      $default = Locale::lookup($locales, $accept, false, static::get('default.lang'));
+      Locale::setDefault($default);
+    });
+  }
+  
   public static function configure($configuration = array()) {
     if (static::configured()) {
       return static::configuration();

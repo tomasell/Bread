@@ -130,7 +130,6 @@ abstract class Dough {
   public static function get($key = null) {
     $configuration = null;
     $self = get_called_class();
-    $self::configure();
     if (is_null($key)) {
       return isset(self::$_configurations[$self]) ? self::$_configurations[$self]
         : $configuration;

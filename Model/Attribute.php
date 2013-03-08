@@ -15,10 +15,11 @@
 
 namespace Bread\Model;
 
-use Bread\Model;
-use SplObjectStorage;
+use SplObjectStorage, JsonSerializable;
 
-class Attribute extends SplObjectStorage {
+class Attribute extends SplObjectStorage implements JsonSerializable {
+  protected $current;
+
   public function __construct($storage = array()) {
     foreach ($storage as $item) {
       $this->attach($item['_obj'], $item['_inf']);
@@ -26,7 +27,7 @@ class Attribute extends SplObjectStorage {
   }
 
   public function __toString() {
-    return (string) $this->getInfo();
+    return $this->offsetGet($this->current);
   }
 
   public function __toArray() {
@@ -51,7 +52,15 @@ class Attribute extends SplObjectStorage {
     return false;
   }
 
-  public function getHash(Model $model) {
+  public function seek($model) {
+    $this->current = $model;
+  }
+
+  public function getHash($model) {
     return $model->key(true);
+  }
+  
+  public function jsonSerialize() {
+    return $this->offsetGet($this->current);
   }
 }

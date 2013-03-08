@@ -25,6 +25,7 @@ abstract class Localized extends Bread\Model {
   public function __construct($attributes = array()) {
     foreach (static::$localized as $attribute) {
       $this->$attribute = new Attribute();
+      $this->$attribute->seek(Locale::$current);
     }
     parent::__construct($attributes);
   }
@@ -39,8 +40,11 @@ abstract class Localized extends Bread\Model {
   public function __set($attribute, $value) {
     if (in_array($attribute, static::$localized)) {
       if ($value instanceof Attribute) {
-        $this->validate($attribute, $value->getInfo());
+        foreach ($value as $locale) {
+          $this->validate($attribute, $value->offsetGet($locale));
+        }
         $this->$attribute = $value;
+        $this->$attribute->seek(Locale::$current);
       }
       else {
         $this->validate($attribute, $value);
@@ -50,5 +54,20 @@ abstract class Localized extends Bread\Model {
     else {
       parent::__set($attribute, $value);
     }
+  }
+
+  public function localize(Locale\Model $locale) {
+    foreach (static::$localized as $attribute) {
+      $this->$attribute->seek($locale);
+    }
+  }
+  
+  public static function configure($configuration = array()) {
+    Locale::configure();
+    $configuration = parent::configure($configuration);
+    foreach (static::$localized as $attribute) {
+      static::cfg("attributes.$attribute.data", 'Bread\L10n\Locale\Model');
+    }
+    return static::configuration();
   }
 }

@@ -23,6 +23,7 @@ class Request extends Message {
   public $requestLine;
   public $method;
   public $uri;
+  public $query;
 
   public function __construct(Networking\Interfaces\Connection $connection,
     $method = 'GET', $uri = '/', $protocol = 'HTTP/1.1', $headers = array(),
@@ -31,7 +32,8 @@ class Request extends Message {
       $method, $uri, $protocol
     ));
     $this->method = $method;
-    $this->uri = $uri;
+    $this->uri = parse_url($uri, PHP_URL_PATH);
+    $this->query = new Request\Query(parse_url($uri, PHP_URL_QUERY));
     parent::__construct($connection, $protocol, $this->requestLine, $headers, $body);
   }
 

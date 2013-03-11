@@ -47,10 +47,14 @@ class LDAP implements Database\Interfaces\Driver {
     ldap_close($this->link);
   }
 
-  public function store(&$object) {
+  public function store($object) {
     $class = get_class($object);
     $dn = $this->dn($model);
-    $entry = (array) $object;
+    $entry = array();
+    // TODO protected method to extract object attributes
+    foreach ($object as $attribute => $value) {
+      $entry[$attribute] = $value;
+    }
     $this->denormalizeEntry($entry);
     if (ldap_search($this->link, $dn, self::FILTER_ALL)) {
       if (!ldap_modify($this->link, $dn, $entry)) {
@@ -65,7 +69,7 @@ class LDAP implements Database\Interfaces\Driver {
     return Promise\When::resolve($object);
   }
 
-  public function delete(&$object) {
+  public function delete($object) {
     $class = get_class($object);
     $dn = $this->dn($model);
     if (!ldap_delete($this->link, $dn)) {

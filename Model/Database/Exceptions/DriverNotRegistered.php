@@ -13,13 +13,12 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Database\Interfaces;
+namespace Bread\Model\Database\Exceptions;
 
-interface Driver {
-  public function store($object);
-  public function delete($object);
-  public function count($class, $search = array(), $options = array());
-  public function first($class, $search = array(), $options = array());
-  public function fetch($class, $search = array(), $options = array());
-  public function purge($class, $search = array(), $options = array());
+use Exception;
+
+class DriverNotRegistered extends Exception {
+  public function __construct($class) {
+    parent::__construct(sprintf("No drivers registered for class %s", $class));
+  }
 }

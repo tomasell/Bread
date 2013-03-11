@@ -20,10 +20,12 @@ use Bread\Caching\Cache;
 use Bread\Configuration;
 use Bread\Model\Database;
 use Exception;
+use IteratorAggregate, ArrayIterator;
+use JsonSerializable;
 
-abstract class Model {
-
+abstract class Model implements IteratorAggregate, JsonSerializable {
   public function __construct($attributes = array()) {
+    static::configure();
     foreach (array_intersect_key($attributes, get_object_vars($this)) as $attribute => $value) {
       $this->__set($attribute, $value);
     }
@@ -37,7 +39,15 @@ abstract class Model {
   public function __get($attribute) {
     return $this->$attribute;
   }
+  
+  public function getIterator() {
+    return new ArrayIterator(get_object_vars($this));
+  }
 
+  public function jsonSerialize() {
+    return get_object_vars($this);
+  }
+  
   public function validate($attribute, $value) {
   }
 
@@ -67,18 +77,24 @@ abstract class Model {
     return static::cached(__FUNCTION__, $search, $options);
   }
 
-  public static function configure() {
-    $class = get_called_class();
-    Database::register($class::get('database.url'), $class);
-  }
-
   public static function get($key = null) {
     $class = get_called_class();
     return Configuration\Manager::get($class, $key);
   }
 
+  public static function configure() {
+    $class = get_called_class();
+    try {
+      Database::driver($class);
+    }
+    catch (Database\Exceptions\DriverNotRegistered $dnr) {
+      Database::register(static::get('database.url'), $class);
+    }
+  }
+  
   protected static function cached($function, $search = array(),
     $options = array()) {
+    static::configure();
     $class = get_called_class();
     $key = implode('::', array(
       $class,

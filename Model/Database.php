@@ -16,6 +16,7 @@
 namespace Bread\Model;
 
 use Bread\Configuration\Manager as CM;
+use Bread\Model\Database\Exceptions;
 use Exception;
 
 class Database {
@@ -31,12 +32,12 @@ class Database {
   public static function driver($class) {
     $classes = class_parents($class);
     array_unshift($classes, $class);
-    foreach ($classes as $class) {
-      if (isset(static::$drivers[$class])) {
-        return static::$drivers[$class];
+    foreach ($classes as $c) {
+      if (isset(static::$drivers[$c])) {
+        return static::$drivers[$c];
       }
     }
-    throw new Exception("No drivers registered for class {$class}.");
+    throw new Exceptions\DriverNotRegistered($class);
   }
 
   public static function factory($url) {

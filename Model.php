@@ -24,7 +24,7 @@ use Exception;
 abstract class Model {
 
   public function __construct($attributes = array()) {
-    foreach (array_diff_key(get_object_vars($this), $attributes) as $attribute => $value) {
+    foreach (array_intersect_key($attributes, get_object_vars($this)) as $attribute => $value) {
       $this->__set($attribute, $value);
     }
   }

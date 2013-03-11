@@ -15,25 +15,16 @@
 
 namespace Bread;
 
-use Bread\Core;
 use Bread\L10n\Locale;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
 
-abstract class View extends Core\Dough {
+abstract class View {
   protected $request;
   protected $response;
-
-  /**
-   * The Locale controller for $request
-   *
-   * @var Locale\Controller $locale
-   */
-  protected $locale;
 
   public function __construct(Request $request, Response $response) {
     $this->request = $request;
     $this->response = $response;
-    $this->locale = new Locale\Controller($request, $response);
   }
 }

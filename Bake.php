@@ -15,9 +15,9 @@
 
 namespace Bread;
 
-use Bread\Core\ClassLoader;
+use Bread\Dough\ClassLoader;
 
-require 'Core' . DIRECTORY_SEPARATOR . 'ClassLoader.php';
+require 'Dough' . DIRECTORY_SEPARATOR . 'ClassLoader.php';
 
 /**
  * Define a shortcut for DIRECTORY_SEPARATOR

@@ -16,7 +16,7 @@
 namespace Bread\L10n\Gettext;
 
 use Bread;
-use Bread\Model\Interfaces;
+use Bread\Model\Database\Interfaces;
 
-class Database implements Interfaces\Database {
+class Database implements Interfaces\Driver {
 }

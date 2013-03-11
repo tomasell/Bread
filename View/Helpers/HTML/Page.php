@@ -39,6 +39,11 @@ class Page extends DOM\Document {
     return new Node($this, parent::__invoke($name, $context));
   }
 
+  public function __toString() {
+    $this->compose();
+    return parent::__toString();
+  }
+
   public function create($name, $value = null, $attributes = array()) {
     $classes = explode('.', $name);
     $name = array_shift($classes);
@@ -51,13 +56,10 @@ class Page extends DOM\Document {
         $classes[] = $attributes['class'];
       }
       $attributes = array_merge($attributes, array(
-          'class' => implode(" ", array_unique($classes))
+        'class' => implode(" ", array_unique($classes))
       ));
     }
-    list($name, $id) = explode('#', $name)
-    + array(
-        null, null
-    );
+    list($name, $id) = explode('#', $name) + array(null, null);
     if ($id) {
       $attributes['id'] = $id;
     }
@@ -82,12 +84,31 @@ class Page extends DOM\Document {
     return $this->document->saveHTML($node);
   }
 
-  public function compose() {
+  public function compose($messages = array()) {
     if ($this->composed) {
       return;
     }
     foreach ($this('[data-bread-block]') as $block) {
       $name = $block->attr('data-bread-block');
+    }
+    foreach ($messages as $severity => $_messages) {
+      foreach ($_messages as $message) {
+        switch ($severity) {
+        case LOG_INFO:
+          $class = 'alert.alert-info';
+          break;
+        case LOG_NOTICE:
+          $class = 'alert.alert-success';
+          break;
+        case LOG_WARNING:
+          $class = 'alert';
+          break;
+        case LOG_ERR:
+          $class = 'alert.alert-error';
+          break;
+        }
+        $this('[data-bread-messages]')->append("div.$class", $message);
+      }
     }
     $this->composed = true;
   }

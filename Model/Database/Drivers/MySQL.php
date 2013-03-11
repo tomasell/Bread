@@ -13,9 +13,10 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Database\Driver;
+namespace Bread\Model\Database\Drivers;
 
 use Bread;
+use Bread\Configuration\Manager as CM;
 use Bread\Promise;
 use Bread\Model\Interfaces;
 use Bread\Model\Database;
@@ -24,7 +25,7 @@ use Exception;
 use DateTime;
 use mysqli;
 
-class MySQL implements Interfaces\Database {
+class MySQL implements Database\Interfaces\Driver {
   const DEFAULT_PORT = 3306;
   const DATETIME_FORMAT = 'Y-m-d H:i:s';
   const INDEX_TABLE = '_index';
@@ -66,7 +67,7 @@ class MySQL implements Interfaces\Database {
     }
   }
 
-  public function store(Bread\Model &$model) {
+  public function store(&$model) {
     $class = get_class($model);
     $tables = $this->tablesFor($class);
     $this->link->autocommit(false);
@@ -120,7 +121,7 @@ class MySQL implements Interfaces\Database {
     return Promise\When::resolve($model);
   }
 
-  public function delete(Bread\Model $model) {
+  public function delete(&$model) {
     $table = $this->tableName($model);
     $where = $this->normalizeSearch($class, array(
       $model->key()
@@ -157,7 +158,7 @@ class MySQL implements Interfaces\Database {
         $query = "SELECT $projection FROM `{$table}` WHERE {$where}";
         foreach ($this->query($query) as $row) {
           $attributes = array();
-          $properties = array_merge($class::get("attributes"), $row);
+          $properties = array_merge((array) $class::get("attributes"), $row);
           foreach ($properties as $attribute => $value) {
             if ($class::get("attributes.$attribute.multiple")) {
               $multiple = array();
@@ -184,7 +185,7 @@ class MySQL implements Interfaces\Database {
       : Promise\When::resolve($models);
   }
 
-  public function purge($class) {
+  public function purge($class, $search = array(), $options = array()) {
     $table = $this->tableName($class);
     $this->query("TRUNCATE TABLE `{$table}`");
     return Promise\When::resolve();
@@ -218,11 +219,11 @@ class MySQL implements Interfaces\Database {
     $tables = $this->tablesFor($class);
     $table = array_shift($tables);
     $projection = $this->projection($table);
-    $key = implode('`, `', $class::$key);
+    $key = implode('`, `', (array) CM::get($class, 'keys'));
     $joins = $tables ? "LEFT JOIN `"
         . implode("` USING (`$key`) LEFT JOIN `", $tables) . "` USING (`$key`)"
       : '';
-    $projection = implode("`, `$table`.`", $class::$key);
+    $projection = implode("`, `$table`.`", CM::get($class, 'keys'));
     $query = "SELECT `{$table}`.`{$projection}` FROM `{$table}` {$joins} "
       . "WHERE {$where} GROUP BY `{$table}`.`{$projection}` {$options}";
     return $this->query($query);
@@ -383,6 +384,10 @@ class MySQL implements Interfaces\Database {
                 break;
               case '$ne':
                 $op = 'IS NOT';
+                break;
+              case '$regex':
+                $op = 'REGEXP';
+                $v = trim($v, $v[0]);
                 break;
               case '$all':
                 $all = array_map(function ($value) use ($attribute) {
@@ -590,8 +595,8 @@ class MySQL implements Interfaces\Database {
       $this->query("INSERT INTO `" . self::INDEX_TABLE
         . "` VALUES ('%s', '%s')", $class, $table);
     }
-    $key = implode('`, `', $class::$key);
     if (!$this->tableExists($table)) {
+      $key = implode('`, `', CM::get($class, 'keys'));
       $model = new $class();
       $attributes = $model->attributes();
       $queries = array();
@@ -609,7 +614,7 @@ class MySQL implements Interfaces\Database {
       $queries[] = $query;
       foreach ($multiples as $column) {
         $query = "CREATE TABLE IF NOT EXISTS `{$table}_{$column}` (\n\t";
-        foreach ($class::$key as $k) {
+        foreach ((array) CM::get($class, 'keys') as $k) {
           $query .= $this->createQuery($class, $k);
         }
         $query .= "`_` INT unsigned NOT NULL DEFAULT 0,\n\t";
@@ -636,6 +641,9 @@ class MySQL implements Interfaces\Database {
 
   protected function tableName($class) {
     $class = is_object($class) ? get_class($class) : $class;
+    if ($tableName = CM::get($class, 'database.mysql.table')) {
+      return $tableName;
+    }
     $query = "SELECT * FROM `" . self::INDEX_TABLE . "` WHERE `class` = '%s'";
     $results = $this->query($query, $class);
     $result = array_shift($results);

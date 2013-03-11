@@ -36,10 +36,25 @@ abstract class Controller {
    * @var Response $response
    */
   protected $response;
+  protected $deferred;
+  protected $resolver;
+  protected $promise;
+  protected $data;
 
   public function __construct(Request $request, Response $response) {
     $this->request = $request;
     $this->response = $response;
+    $this->deferred = new Promise\Deferred();
+    $this->resolver = $this->deferred->resolver();
+    $this->promise = $this->deferred->promise();
+    $this->data = new Promise\Deferred();
+    $this->request->on('data', function($data) {
+      $this->data->progress($data);
+    })->on('end', function() {
+      $this->resolver->resolve();
+    })->body->on('end', function($data) {
+      $this->data->resolve($this->request->body->contents());
+    });
   }
 
   public static function get($key = null) {

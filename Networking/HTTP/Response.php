@@ -83,6 +83,8 @@ class Response extends Message {
     510 => "Not Extended"
   );
 
+  public $messages = array();
+
   public function __construct(Connection $connection, $status = 200, $body = null,
     $headers = array(), $protocol = 'HTTP/1.1') {
     $this->status($status, $protocol);
@@ -98,5 +100,13 @@ class Response extends Message {
     $this->startLine = $this->statusLine = implode(' ', array(
       $protocol, $this->status, $this->reason
     ));
+  }
+
+  public function message($message, $severity = LOG_INFO) {
+    $args = func_get_args();
+    if (!isset($this->messages[$severity])) {
+      $this->messages[$severity] = array();
+    }
+    $this->messages[$severity][] = $message;
   }
 }

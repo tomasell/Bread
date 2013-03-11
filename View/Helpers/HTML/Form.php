@@ -61,7 +61,13 @@ class Form extends Node {
       }
     }
     $input->attr($attributes);
-    return $input;
+    return $controlGroup;
+  }
+
+  public function fieldset($legend) {
+    $fieldset = $this->append('fieldset');
+    $fieldset->append('legend', $legend);
+    return $fieldset;
   }
 
   public function actions($actions = array()) {

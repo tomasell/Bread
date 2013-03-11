@@ -20,7 +20,7 @@ use DOMXPath;
 
 class Page extends DOM\Document {
   protected $composed = false;
-  
+
   public function __construct($html = null) {
     parent::__construct('html');
     if ($html) {
@@ -34,7 +34,7 @@ class Page extends DOM\Document {
       $this->body = $this->root->append('body');
     }
   }
-  
+
   public function __invoke($name, $context = null) {
     return new Node($this, parent::__invoke($name, $context));
   }
@@ -67,7 +67,7 @@ class Page extends DOM\Document {
     }
     return new Node($this, $element);
   }
-  
+
   public function load($filename, $options = LIBXML_NOXMLDECL) {
     libxml_use_internal_errors(true);
     $this->document->loadHTMLFile($filename);
@@ -76,12 +76,12 @@ class Page extends DOM\Document {
     libxml_clear_errors();
     libxml_use_internal_errors(false);
   }
-  
+
   public function save($node = null, $options = LIBXML_NOXMLDECL) {
     $this->compose();
     return $this->document->saveHTML($node);
   }
-  
+
   public function compose() {
     if ($this->composed) {
       return;

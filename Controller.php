@@ -15,31 +15,35 @@
 
 namespace Bread;
 
-use Bread\Core;
+use Bread\Configuration;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
 
 /**
  * Application controller class for organization of business logic.
  */
-abstract class Controller extends Core\Dough {
+abstract class Controller {
   /**
    * The HTTP request to control
-   * 
+   *
    * @var Request $request
    */
   protected $request;
 
   /**
    * The HTTP response to generate
-   * 
+   *
    * @var Response $response
    */
   protected $response;
 
   public function __construct(Request $request, Response $response) {
-    parent::__construct();
     $this->request = $request;
     $this->response = $response;
+  }
+
+  public static function get($key = null) {
+    $class = get_called_class();
+    return Configuration\Manager::get($class, $key);
   }
 }

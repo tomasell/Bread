@@ -13,13 +13,15 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache;
+namespace Bread\Dough;
 
-class Factory {
-  public static function create() {
-    if (class_exists('APCIterator')) {
-      return new Engine\APC();
+abstract class Singleton {
+  protected static $instance;
+
+  public static function instance() {
+    if (!isset(static::$instance)) {
+      static::$instance = new static();
     }
-    return new Engine\Internal();
+    return static::$instance();
   }
 }

@@ -15,8 +15,8 @@
 
 namespace Bread\Promise\Traits;
 
-use Bread\Interfaces;
 use Bread\Promise;
+use Bread\Promise\Interfaces;
 
 trait PromiseFor {
   public static function promiseFor($promiseOrValue) {

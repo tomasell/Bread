@@ -16,47 +16,24 @@
 namespace Bread\L10n;
 
 use Bread;
-use Bread\Model\Attribute;
+use Bread\Configuration\Manager as CM;
 use Bread\L10n\Locale\Controller as Locale;
 
 abstract class Localized extends Bread\Model {
-  protected static $localized = array();
-  
-  public function __get($attribute) {
-    if (in_array($attribute, static::$localized)) {
-      if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
-        $this->$attribute = new Attribute();
-      }
-      return $this->$attribute->offsetGet(Locale::$current);
-    }
-    else {
-      return parent::__get($attribute);
-    }
-  }
-  
   public function __set($attribute, $value) {
-    if (in_array($attribute, static::$localized)) {
-      if (!is_a($this->$attribute, 'Bread\Model\Attribute')) {
-        $this->$attribute = new Attribute();
-      }
-      if (is_array($value)) {
-        foreach ($value as $v) {
-          $this->validate($attribute, $v['$val']);
-          $this->$attribute->attach($v['$key'], $v['$val']);
+    $tags = explode(';', $attribute);
+    $attribute = array_shift($tags);
+    if ($tags) {
+      foreach ($tags as $tag) {
+        list($k, $v) = explode('-', $tag, 1);
+        switch ($k) {
+          case 'lang':
+
         }
       }
-      else {
-        $this->validate($attribute, $value);
-        $this->$attribute->attach(Locale::$current, $value);
-      }
-    }
-    else {
-      parent::__set($attribute, $value);
     }
   }
-  
-  public static function configure($configuration = array()) {
-    Locale::configure();
-    return parent::configure($configuration);
+
+  public function __get($attribute) {
   }
 }

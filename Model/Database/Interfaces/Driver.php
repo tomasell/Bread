@@ -13,14 +13,13 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Interfaces;
+namespace Bread\Model\Database\Interfaces;
 
-interface Cache {
-  public function get($key);
-
-  public function set($key, $value);
-
-  public function remove($key);
-
-  public function clear();
+interface Driver {
+  public function store(&$object);
+  public function delete(&$object);
+  public function count($class, $search = array(), $options = array());
+  public function first($class, $search = array(), $options = array());
+  public function fetch($class, $search = array(), $options = array());
+  public function purge($class, $search = array(), $options = array());
 }

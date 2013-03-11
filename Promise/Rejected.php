@@ -15,10 +15,9 @@
 
 namespace Bread\Promise;
 
-use Bread;
 use Exception;
 
-class Rejected implements Bread\Interfaces\Promise {
+class Rejected implements Interfaces\Promise {
   use Traits\PromiseFor;
 
   private $reason;

@@ -20,7 +20,7 @@ class Table extends Node {
   public $thead;
   public $tbody;
   public $tfoot;
-  
+
   public function __construct(Page $page, $columns = array()) {
     parent::__construct($page, 'table');
     $this->addClass('table');
@@ -31,12 +31,12 @@ class Table extends Node {
       $this->thead->append('th')->text($column);
     }
   }
-  
+
   public function row() {
     return $this->tbody->append('tr');
   }
-  
-  public function cell(Node $row, $content) {
+
+  public function cell(Node $row, $content = null) {
     return $row->append('td')->text($content);
   }
 }

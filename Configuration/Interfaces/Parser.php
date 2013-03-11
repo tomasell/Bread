@@ -13,27 +13,20 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread;
+namespace Bread\Configuration\Interfaces;
 
-use Bread\Core;
-use Bread\L10n\Locale;
-use Bread\Networking\HTTP\Request;
-use Bread\Networking\HTTP\Response;
-
-abstract class View extends Core\Dough {
-  protected $request;
-  protected $response;
+/**
+ * The interface for configuration parsers.
+ *
+ * @author Giovanni Lovato <heruan@aldu.net>
+ */
+interface Parser {
 
   /**
-   * The Locale controller for $request
+   * Parses a configuration file and returns an array with configuration entries.
    *
-   * @var Locale\Controller $locale
+   * @param string $filename The file to parse
+   * @return array The configuration array
    */
-  protected $locale;
-
-  public function __construct(Request $request, Response $response) {
-    $this->request = $request;
-    $this->response = $response;
-    $this->locale = new Locale\Controller($request, $response);
-  }
+  public static function parse($filename);
 }

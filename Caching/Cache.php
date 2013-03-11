@@ -13,27 +13,22 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread;
+namespace Bread\Caching;
 
-use Bread\Core;
-use Bread\L10n\Locale;
-use Bread\Networking\HTTP\Request;
-use Bread\Networking\HTTP\Response;
+use Bread\Dough;
 
-abstract class View extends Core\Dough {
-  protected $request;
-  protected $response;
+class Cache extends Dough\Singleton {
+  public static function factory() {
+    if (class_exists('APCIterator')) {
+      return new Engines\APC();
+    }
+    return new Engines\Internal();
+  }
 
-  /**
-   * The Locale controller for $request
-   *
-   * @var Locale\Controller $locale
-   */
-  protected $locale;
-
-  public function __construct(Request $request, Response $response) {
-    $this->request = $request;
-    $this->response = $response;
-    $this->locale = new Locale\Controller($request, $response);
+  public static function instance() {
+    if (!isset(static::$instance)) {
+      static::$instance = static::factory();
+    }
+    return static::$instance;
   }
 }

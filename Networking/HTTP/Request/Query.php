@@ -13,46 +13,42 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Networking\HTTP\Message;
+namespace Bread\Networking\HTTP\Request;
 
 use ArrayAccess, Countable, IteratorAggregate, ArrayIterator;
 
-class Headers implements ArrayAccess, Countable, IteratorAggregate {
-  protected $headers;
+class Query implements ArrayAccess, Countable, IteratorAggregate {
+  protected $query;
 
-  public function __construct($headers = array()) {
-    $this->headers = $headers;
+  public function __construct($query) {
+    parse_str($query, $this->query);
   }
 
   public function __toString() {
-    return implode("\r\n",
-      array_map(
-        function ($offset, $value) {
-          return "{$offset}: {$value}";
-        }, array_keys($this->headers), $this->headers));
+    return http_build_query($this->query);
   }
 
   public function offsetExists($offset) {
-    return isset($this->headers[$offset]);
+    return isset($this->query[$offset]);
   }
 
   public function offsetGet($offset) {
-    return isset($this->headers[$offset]) ? $this->headers[$offset] : null;
+    return isset($this->query[$offset]) ? $this->query[$offset] : null;
   }
 
   public function offsetSet($offset, $value) {
-    $this->headers[$offset] = $value;
+    $this->query[$offset] = $value;
   }
 
   public function offsetUnset($offset) {
-    unset($this->headers[$offset]);
+    unset($this->query[$offset]);
   }
 
   public function count() {
-    return count($this->headers);
+    return count($this->query);
   }
 
   public function getIterator() {
-    return new ArrayIterator($this->headers);
+    return new ArrayIterator($this->query);
   }
 }

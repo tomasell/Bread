@@ -16,14 +16,26 @@
 namespace Bread\Model\Database;
 
 use Bread;
+use Bread\Model\Database;
+use Bread\Configuration\Manager as CM;
+use Exception;
 
 class Reference {
   public $_class;
   public $_key;
-  
-  public function __construct(Bread\Model $model) {
-    $this->_class = get_class($model);
-    $this->_key = $model->key();
+
+  public function __construct($object) {
+    $this->_class = get_class($object);
+    $this->_key = $this->keys($object);
+  }
+
+  protected function keys($object) {
+    $class = get_class($object);
+    $keys = array();
+    foreach ((array) CM::get($class, 'keys') as $key) {
+      $keys[$key] = $object->$key;
+    }
+    return $keys;
   }
 
   public static function is($reference) {
@@ -44,7 +56,7 @@ class Reference {
 
   public static function fetch($reference) {
     if (!static::is($reference)) {
-      throw new Bread\Exception("Not a valid reference");
+      throw new Exception("Not a valid reference");
     }
     elseif (is_string($reference)) {
       $reference = json_decode($reference, true);
@@ -53,6 +65,6 @@ class Reference {
       $reference = (object) $reference;
     }
     $class = $reference->_class;
-    return $class::first($reference->_key);
+    return Database::driver($class)->first($class, $reference->_key);
   }
 }

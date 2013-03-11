@@ -13,9 +13,11 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Interfaces;
+namespace Bread\Caching\Interfaces;
 
-interface Promise {
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null);
+interface Engine {
+  public function fetch($key);
+  public function store($key, $value);
+  public function delete($key);
+  public function clear();
 }

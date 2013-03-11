@@ -15,10 +15,9 @@
 
 namespace Bread\Promise;
 
-use Bread;
 use Exception;
 
-class Deferred implements Bread\Interfaces\Promise, Interfaces\Resolver,
+class Deferred implements Interfaces\Promise, Interfaces\Resolver,
   Interfaces\Promisor {
   use Traits\PromiseFor;
 

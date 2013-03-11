@@ -13,12 +13,15 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Core;
+namespace Bread\Configuration\Parsers;
+
+use Bread;
+use Exception;
 
 /**
  * Allows for multi-dimensional ini files.
  *
- * The native parse_ini_file() function will convert the following ini file:...
+ * The native parse_ini_file() function will convert the following ini file:
  *
  * [production]
  * localhost.database.host = 1.2.3.4
@@ -30,35 +33,37 @@ namespace Bread\Core;
  * localhost.database.host = localhost
  * debug.enabled = true
  *
- * ...into the following array:
+ * into the following array:
  *
- * array
- *   'localhost.database.host' => 'localhost'
- *   'localhost.database.user' => 'root'
- *   'localhost.database.password' => 'abcdef'
+ * Array (
+ *   'localhost.database.host' => 'localhost',
+ *   'localhost.database.user' => 'root',
+ *   'localhost.database.password' => 'abcdef',
  *   'debug.enabled' => 1
+ * )
  *
  * This class allows you to convert the specified ini file into a multi-dimensional
  * array. In this case the structure generated will be:
  *
- * array
- *   'localhost' =>
- *     array
- *       'database' =>
- *         array
- *           'host' => 'localhost'
- *           'user' => 'root'
- *           'password' => 'abcdef'
- *   'debug' =>
- *     array
+ * Array (
+ *   'localhost' => Array (
+ *     'database' => Array (
+ *       'host' => 'localhost',
+ *       'user' => 'root',
+ *       'password' => 'abcdef',
+ *     ),
+ *     'debug' => Array (
  *       'enabled' => 1
+ *     )
+ *   )
+ * )
  *
  * As you can also see you can have sections that extend other sections (use ":" for that).
  * The extendable section must be defined BEFORE the extending section or otherwise
  * you will get an exception.
  *
  */
-class Configuration {
+class Initialization implements Bread\Configuration\Interfaces\Parser {
   /**
    * Internal storage array
    *
@@ -79,7 +84,7 @@ class Configuration {
    * @throws Exception
    * @return array|boolean
    */
-  public static function parse($filename, $process_sections = false,
+  public static function parse($filename, $process_sections = true,
     $section_name = null) {
     if (is_array($filename)) {
       $ini = $filename;
@@ -119,9 +124,8 @@ class Configuration {
           return self::$_result[$section_name];
         }
         else {
-          throw new Exception(
-            'Section ' . $section_name
-              . ' not found in the initilanization file');
+          throw new Exception('Section ' . $section_name
+            . ' not found in the initilanization file');
         }
       }
     }
@@ -139,26 +143,8 @@ class Configuration {
    * @return void
    */
   private static function _processSection($section, array $contents) {
-    // the section does not extend another section
-    if (stripos($section, '@') !== false) {
-      // extract section names
-      list($section, $host) = explode('@', $section);
-      $section = trim($section);
-      $host = trim($host);
-      // TODO Match request host
-      //if (!preg_match("/$host/", $this->request->host)) {
-      //  return;
-      //}
-      if (isset(self::$_result[$section])) {
-        self::$_result[$section] = self::_arrayMergeRecursive(self::$_result[$section], self::_processSectionContents($contents));
-        return;
-      }
-    }
-    // the section does not extend another section
     if (stripos($section, ':') === false) {
       self::$_result[$section] = self::_processSectionContents($contents);
-
-      // section extends another section
     }
     else {
       // extract section names
@@ -168,8 +154,8 @@ class Configuration {
 
       // check if the extended section exists
       if (!isset(self::$_result[$ext_source])) {
-        throw new Exception(
-          'Unable to extend section ' . $ext_source . ', section not found');
+        throw new Exception('Unable to extend section ' . $ext_source
+          . ', section not found');
       }
 
       // process section contents
@@ -212,17 +198,13 @@ class Configuration {
     $pos = strpos($path, '.');
 
     if ($pos === false) {
-      return array(
-        $path => $value
-      );
+      return array($path => $value);
     }
 
     $key = substr($path, 0, $pos);
     $path = substr($path, $pos + 1);
 
-    $result = array(
-      $key => self::_processContentEntry($path, $value),
-    );
+    $result = array($key => self::_processContentEntry($path, $value),);
 
     return $result;
   }
@@ -245,9 +227,7 @@ class Configuration {
         }
         else {
           if ($key === 0) {
-            $a = array(
-              0 => self::_arrayMergeRecursive($a, $value)
-            );
+            $a = array(0 => self::_arrayMergeRecursive($a, $value));
           }
           else {
             $a[$key] = $value;

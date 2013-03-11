@@ -13,15 +13,12 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Interfaces;
+namespace Bread\Configuration\Parsers;
 
 use Bread;
 
-interface Database {
-  public function store(Bread\Model &$model);
-  public function delete(Bread\Model $model);
-  public function count($class, $search = array(), $options = array());
-  public function first($class, $search = array(), $options = array());
-  public function fetch($class, $search = array(), $options = array());
-  public function purge($class);
+class PHP implements Bread\Configuration\Interfaces\Parser {
+  public static function parse($filename) {
+    return include $filename;
+  }
 }

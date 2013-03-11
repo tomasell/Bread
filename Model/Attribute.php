@@ -18,25 +18,49 @@ namespace Bread\Model;
 use SplObjectStorage, JsonSerializable;
 
 class Attribute extends SplObjectStorage implements JsonSerializable {
-  public function __invoke($key) {
-    return $this->offsetGet($key);
+  protected $current;
+
+  public function __construct($storage = array()) {
+    foreach ($storage as $item) {
+      $this->attach($item['_obj'], $item['_inf']);
+    }
   }
 
   public function __toString() {
-    return (string) $this->current();
+    return $this->offsetGet($this->current);
   }
 
   public function __toArray() {
-    $attribute = array();
-    foreach ($this as $key) {
-      $attribute[] = array(
-        '$key' => $key, '$val' => $this->offsetGet($key)
+    $storage = array();
+    foreach ($this as $obj) {
+      $storage[] = array(
+        '_obj' => $obj, '_inf' => $this->offsetGet($obj)
       );
     }
-    return $attribute;
+    return $storage;
+  }
+
+  public static function is($array) {
+    if ($array instanceof static) {
+      return true;
+    }
+    if (is_array($array)) {
+      if (($current = current($array)) && is_array($current)) {
+        return (isset($current['_obj']) && isset($current['_inf']));
+      }
+    }
+    return false;
+  }
+
+  public function seek($model) {
+    $this->current = $model;
+  }
+
+  public function getHash($model) {
+    return $model->key(true);
   }
   
   public function jsonSerialize() {
-    return $this->__toArray();
+    return $this->offsetGet($this->current);
   }
 }

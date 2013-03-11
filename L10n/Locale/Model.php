@@ -16,15 +16,12 @@
 namespace Bread\L10n\Locale;
 
 use Bread;
-use Bread\L10n\Localized;
+use Bread\Configuration\Manager as CM;
 
 class Model extends Bread\Model {
-  protected $code;
+  protected $lang;
   protected $name;
   protected $plural = 'nplurals=2; plural=(n != 1)';
-
-  public static $key = array('code');
-  protected static $localized = array(
-    'name'
-  );
 }
+
+CM::defaults('Bread\L10n\Local\Model', array('keys' => array('lang')));

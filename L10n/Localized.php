@@ -16,58 +16,24 @@
 namespace Bread\L10n;
 
 use Bread;
-use Bread\Model\Attribute;
+use Bread\Configuration\Manager as CM;
 use Bread\L10n\Locale\Controller as Locale;
 
 abstract class Localized extends Bread\Model {
-  protected static $localized = array();
+  public function __set($attribute, $value) {
+    $tags = explode(';', $attribute);
+    $attribute = array_shift($tags);
+    if ($tags) {
+      foreach ($tags as $tag) {
+        list($k, $v) = explode('-', $tag, 1);
+        switch ($k) {
+          case 'lang':
 
-  public function __construct($attributes = array()) {
-    foreach (static::$localized as $attribute) {
-      $this->$attribute = new Attribute();
-      $this->$attribute->seek(Locale::$current);
+        }
+      }
     }
-    parent::__construct($attributes);
   }
 
   public function __get($attribute) {
-    if (in_array($attribute, static::$localized)) {
-      return $this->$attribute->offsetGet(Locale::$current);
-    }
-    return parent::__get($attribute);
-  }
-
-  public function __set($attribute, $value) {
-    if (in_array($attribute, static::$localized)) {
-      if ($value instanceof Attribute) {
-        foreach ($value as $locale) {
-          $this->validate($attribute, $value->offsetGet($locale));
-        }
-        $this->$attribute = $value;
-        $this->$attribute->seek(Locale::$current);
-      }
-      else {
-        $this->validate($attribute, $value);
-        $this->$attribute->attach(Locale::$current, $value);
-      }
-    }
-    else {
-      parent::__set($attribute, $value);
-    }
-  }
-
-  public function localize(Locale\Model $locale) {
-    foreach (static::$localized as $attribute) {
-      $this->$attribute->seek($locale);
-    }
-  }
-  
-  public static function configure($configuration = array()) {
-    Locale::configure();
-    $configuration = parent::configure($configuration);
-    foreach (static::$localized as $attribute) {
-      static::cfg("attributes.$attribute.data", 'Bread\L10n\Locale\Model');
-    }
-    return static::configuration();
   }
 }

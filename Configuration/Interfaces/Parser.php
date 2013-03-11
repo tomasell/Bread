@@ -13,20 +13,20 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Configuration\Interfaces;
 
-use Bread\Promise\Deferred;
-use Bread\Promise\Interfaces;
+/**
+ * The interface for configuration parsers.
+ *
+ * @author Giovanni Lovato <heruan@aldu.net>
+ */
+interface Parser {
 
-class Promise implements Interfaces\Promise {
-  private $deferred;
-
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
-  }
-
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
-  }
+  /**
+   * Parses a configuration file and returns an array with configuration entries.
+   *
+   * @param string $filename The file to parse
+   * @return array The configuration array
+   */
+  public static function parse($filename);
 }

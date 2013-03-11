@@ -16,9 +16,9 @@
 namespace Bread\Promise\Deferred;
 
 use Bread\Promise\Deferred;
-use Bread\Promise;
+use Bread\Promise\Interfaces;
 
-class Resolver implements Promise\Interfaces\Resolver {
+class Resolver implements Interfaces\Resolver {
   private $deferred;
 
   public function __construct(Deferred $deferred) {

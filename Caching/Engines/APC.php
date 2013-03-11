@@ -13,32 +13,35 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Cache\Engine;
+namespace Bread\Caching\Engines;
 
 use Bread;
-use Bread\Promise\When;
+use Bread\Caching;
+use Bread\Promise;
 use APCIterator;
 
-class APC implements Bread\Interfaces\Cache {
-  public function get($key) {
+class APC implements Caching\Interfaces\Engine {
+  public function fetch($key) {
     $result = apc_fetch($key, $success);
     if (!$success) {
-      return When::reject($key);
+      return Promise\When::reject($key);
     }
-    return When::resolve($result);
+    return Promise\When::resolve($result);
   }
 
-  public function set($key, $var) {
-    apc_store($key, $var);
+  public function store($key, $var) {
+    return apc_store($key, $var) ? Promise\When::resolve($var)
+      : Promise\When::reject($key);
   }
 
-  public function remove($key) {
-    $iterator = new APCIterator('user',
-      '/^' . preg_quote($key, '/') . '/', APC_ITER_VALUE);
-    apc_delete($iterator);
+  public function delete($key) {
+    $iterator = new APCIterator('user', $key, APC_ITER_VALUE);
+    return apc_delete($iterator) ? Promise\When::resolve($key)
+      : Promise\When::reject($key);
   }
 
   public function clear() {
-    return apc_clear_cache('user');
+    return apc_clear_cache('user') ? Promise\When::resolve()
+      : Promise\When::reject();
   }
 }

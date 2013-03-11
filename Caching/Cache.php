@@ -13,20 +13,22 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Promise\Deferred;
+namespace Bread\Caching;
 
-use Bread\Promise\Deferred;
-use Bread\Promise\Interfaces;
+use Bread\Dough;
 
-class Promise implements Interfaces\Promise {
-  private $deferred;
-
-  public function __construct(Deferred $deferred) {
-    $this->deferred = $deferred;
+class Cache extends Dough\Singleton {
+  public static function factory() {
+    if (class_exists('APCIterator')) {
+      return new Engines\APC();
+    }
+    return new Engines\Internal();
   }
 
-  public function then($fulfilledHandler = null, $errorHandler = null,
-    $progressHandler = null) {
-    return $this->deferred->then($fulfilledHandler, $errorHandler, $progressHandler);
+  public static function instance() {
+    if (!isset(static::$instance)) {
+      static::$instance = static::factory();
+    }
+    return static::$instance;
   }
 }

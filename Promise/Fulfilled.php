@@ -15,10 +15,9 @@
 
 namespace Bread\Promise;
 
-use Bread;
 use Exception;
 
-class Fulfilled implements Bread\Interfaces\Promise {
+class Fulfilled implements Interfaces\Promise {
   use Traits\PromiseFor;
 
   private $result;

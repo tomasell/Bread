@@ -16,7 +16,7 @@
 namespace Bread\L10n\Message;
 
 use Bread;
-use Bread\L10n\Localized;
+use Bread\Configuration\Manager as CM;
 
 class Model extends Bread\Model {
   protected $locale;
@@ -26,20 +26,15 @@ class Model extends Bread\Model {
   protected $msgid_plural;
   protected $msgstr = array();
 
-  public static $key = array(
-    'locale', 'domain', 'msgctxt', 'msgid'
-  );
-  
-  protected static $attributes = array(
-    'locale' => array(
-      'type' => 'Bread\L10n\Locale\Model'
-    ),
-    'msgstr' => array(
-      'multiple' => true
-    )
-  );
-  
   public function __toString() {
     return (string) current($this->msgstr);
   }
 }
+
+CM::defaults('Bread\L10n\Message\Model', array(
+  'keys' => array('locale', 'domain', 'msgctxt', 'msgid'),
+  'attributes' => array(
+    'locale' => array('type' => 'Bread\L10n\Locale\Model'),
+    'msgstr' => array('multiple' => true)
+  )
+));

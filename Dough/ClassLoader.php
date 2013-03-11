@@ -13,9 +13,7 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Core;
-
-use Bread\Networking\HTTP\Exception;
+namespace Bread\Dough;
 
 /**
  * A <tt>ClassLoader</tt> is an autoloader for class files that can be

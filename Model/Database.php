@@ -26,7 +26,7 @@ class Database {
     if (is_string($driver)) {
       $driver = static::factory($driver);
     }
-    static::$drivers[$class] = $driver;
+    return static::$drivers[$class] = $driver;
   }
 
   public static function driver($class) {
@@ -35,6 +35,9 @@ class Database {
     foreach ($classes as $c) {
       if (isset(static::$drivers[$c])) {
         return static::$drivers[$c];
+      }
+      elseif ($url = CM::get($c, 'database.url')) {
+        return static::register($url, $c);
       }
     }
     throw new Exceptions\DriverNotRegistered($class);

@@ -64,23 +64,6 @@ class Stream extends Event\Emitter implements Stream\Interfaces\Readable,
     ));
   }
 
-  public function seek($offset, $whence = SEEK_SET) {
-    fseek($this->stream, $offset, $whence);
-  }
-
-  public function tell() {
-    return ftell($this->stream);
-  }
-
-  public function rewind() {
-    rewind($this->stream);
-  }
-
-  public function contents($rewind = true) {
-    $rewind && $this->rewind();
-    return stream_get_contents($this->stream);
-  }
-
   public function write($data) {
     if (!$this->writable) {
       return;

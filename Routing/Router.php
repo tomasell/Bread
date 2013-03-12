@@ -18,6 +18,7 @@ namespace Bread\Routing;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Client\Exceptions;
 use Bread\Promise;
+use Bread\L10n\Inflector;
 
 class Router {
   public static $routes = array();
@@ -27,9 +28,17 @@ class Router {
     foreach ($routes as $route) {
       $route = new Route\Model($route);
       if (preg_match($route->pattern, $request->uri, $matches)) {
+        if ($matches['controller']) {
+          $ns = explode('/', $matches['controller']);
+          $ns = array_map('Bread\L10n\Inflector::camelize', $ns);
+          $matches['controller'] = implode(NS, $ns);
+        }
         $matches = array_merge(array(
           'controller' => null, 'action' => null
         ), $route->defaults, $matches);
+        if (isset($matches['namespace'])) {
+          $matches['controller'] = $matches['namespace'] . NS . $matches['controller'] . NS . 'Controller';
+        }
         if (!is_subclass_of($matches['controller'], 'Bread\Controller')) {
           return Promise\When::reject(new Exceptions\NotFound(
             $matches['controller']));

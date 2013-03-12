@@ -15,6 +15,7 @@
 
 namespace Bread\View\Helpers\HTML;
 
+use Bread;
 use Bread\View\Helpers\DOM;
 use DOMXPath;
 
@@ -90,6 +91,9 @@ class Page extends DOM\Document {
     }
     foreach ($this('[data-bread-block]') as $block) {
       $name = $block->attr('data-bread-block');
+      Bread\View\Helpers\UI\Block\Model::first(['name' => $name])->then(function($blocks) use ($block) {
+        $block->append(call_user_func($blocks->callback, $this));
+      });
     }
     foreach ($messages as $severity => $_messages) {
       foreach ($_messages as $message) {

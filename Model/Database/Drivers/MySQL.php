@@ -32,7 +32,6 @@ class MySQL implements Database\Interfaces\Driver {
   const MAX_LIMIT = '18446744073709551615';
 
   protected $database;
-  protected $url;
   protected $link;
 
   public function __construct($url) {
@@ -93,8 +92,9 @@ class MySQL implements Database\Interfaces\Driver {
           foreach ($attribute as $k => $value) {
             $values[] = implode(', ', array_merge($key, array($k, $value)));
           }
-          $where = $this->denormalizeSearch($class, array($key));
-          $this->query("DELETE FROM `{$table}` WHERE $where AND `_` >= %d", count($attribute));
+          $this->denormalizeSearch($class, array($key))->then(function($where) use ($table, $attribute) {
+            $this->query("DELETE FROM `{$table}` WHERE $where AND `_` >= %d", count($attribute));
+          });
         }
         else {
           $values[] = implode(', ', $fields);

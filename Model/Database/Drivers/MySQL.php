@@ -13,18 +13,19 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Model\Database\Driver;
+namespace Bread\Model\Database\Drivers;
 
 use Bread;
+use Bread\Dough\ClassLoader as CL;
+use Bread\Configuration\Manager as CM;
 use Bread\Promise;
-use Bread\Model\Interfaces;
 use Bread\Model\Database;
 use Bread\L10n\Inflector;
 use Exception;
 use DateTime;
 use mysqli;
 
-class MySQL implements Interfaces\Database {
+class MySQL implements Database\Interfaces\Driver {
   const DEFAULT_PORT = 3306;
   const DATETIME_FORMAT = 'Y-m-d H:i:s';
   const INDEX_TABLE = '_index';
@@ -66,13 +67,17 @@ class MySQL implements Interfaces\Database {
     }
   }
 
-  public function store(Bread\Model &$model) {
-    $class = get_class($model);
+  public function store($object) {
+    $class = get_class($object);
     $tables = $this->tablesFor($class);
     $this->link->autocommit(false);
     try {
-      $key = $model->key();
-      $attributes = $model->attributes();
+      $key = $this->keys($object);
+      $attributes = array();
+      // TODO protected method to extract object attributes
+      foreach ($object as $attribute => $value) {
+        $attributes[$attribute] = $value;
+      }
       $this->denormalize($key, $class);
       $this->denormalize($attributes, $class);
       foreach ($tables as $i => $table) {
@@ -80,21 +85,15 @@ class MySQL implements Interfaces\Database {
         $values = array();
         $columns = $this->columns($table);
         $fields = array_intersect_key($attributes, array_flip($columns));
-        list($main, $attribute) = explode('_', $table)
-          + array(
-            null, null
-          );
+        list($main, $attribute) = explode('_', $table) + array(null, null);
         if ($attribute) {
           $update[] = "`{$attribute}` = VALUES(`{$attribute}`)";
-          $attribute =  is_array($fields[$attribute]) ? $fields[$attribute] : array();
+          $attribute = is_array($fields[$attribute]) ? $fields[$attribute]
+            : array();
           foreach ($attribute as $k => $value) {
-            $values[] = implode(', ', array_merge($key, array(
-              $k, $value
-            )));
+            $values[] = implode(', ', array_merge($key, array($k, $value)));
           }
-          $where = $this->normalizeSearch($class, array(
-            $key
-          ));
+          $where = $this->denormalizeSearch($class, array($key));
           $this->query("DELETE FROM `{$table}` WHERE $where AND `_` >= %d", count($attribute));
         }
         else {
@@ -117,24 +116,21 @@ class MySQL implements Interfaces\Database {
     }
     $this->link->commit();
     $this->link->autocommit(true);
-    return Promise\When::resolve($model);
+    return Promise\When::resolve($object);
   }
 
-  public function delete(Bread\Model $model) {
-    $table = $this->tableName($model);
-    $where = $this->normalizeSearch($class, array(
-      $model->key()
-    ));
-    $query = "DELETE FROM `{$table}` WHERE {$where}";
-    $this->query($query);
-    return Promise\When::resolve();
+  public function delete($object) {
+    return $this->denormalizeSearch($class, array($this->keys($object)))->then(function (
+      $where) {
+      $table = $this->tableName($object);
+      $query = "DELETE FROM `{$table}` WHERE {$where}";
+      $this->query($query);
+      return $object;
+    });
   }
 
   public function count($class, $search = array(), $options = array()) {
-    if (!$select = $this->select($class, $search, $options)) {
-      return Promise\When::resolve(0);
-    }
-    return Promise\When::resolve(count($select));
+    return $this->select($class, $search, $options)->then('count');
   }
 
   public function first($class, $search = array(), $options = array()) {
@@ -143,51 +139,59 @@ class MySQL implements Interfaces\Database {
   }
 
   public function fetch($class, $search = array(), $options = array()) {
-    $models = array();
-    try {
-      if (!$select = $this->select($class, $search, $options)) {
-        return Promise\When::reject();
-      }
+    return $this->select($class, $search, $options)->then(function ($select) use (
+      $class) {
+      $promises = array();
       $table = $this->tableName($class);
       foreach ($select as $result) {
-        $where = $this->normalizeSearch($class, array(
-          $result
-        ));
-        $projection = $this->projection($table);
-        $query = "SELECT $projection FROM `{$table}` WHERE {$where}";
-        foreach ($this->query($query) as $row) {
-          $attributes = array();
-          $properties = array_merge($class::get("attributes"), $row);
-          foreach ($properties as $attribute => $value) {
-            if ($class::get("attributes.$attribute.multiple")) {
-              $multiple = array();
-              $where = $this->normalizeSearch($class, array(
-                $result
-              ));
-              $_table = "{$table}_{$attribute}";
-              $projection = $this->projectionFunction($attribute, $this->type($_table, $attribute));
-              foreach ($this->query("SELECT `_`, {$projection} FROM `{$_table}` WHERE {$where}") as $r) {
-                $multiple[$r['_']] = $r[$attribute];
+        $promises[] = $this->denormalizeSearch($class, array($result))->then(function (
+          $where) use ($class, $table) {
+          $projection = $this->projection($table);
+          $query = "SELECT $projection FROM `{$table}` WHERE {$where}";
+          foreach ($this->query($query) as $row) {
+            $attributes = array();
+            $properties = array_merge((array) CM::get($class, "attributes"), $row);
+            foreach ($properties as $attribute => $value) {
+              if (CM::get($class, "attributes.$attribute.multiple")) {
+                $multiple = array();
+                $_table = "{$table}_{$attribute}";
+                $projection = $this->projectionFunction($attribute, $this->type($_table, $attribute));
+                foreach ($this->query("SELECT `_`, {$projection} FROM `{$_table}` WHERE {$where}") as $r) {
+                  $multiple[$r['_']] = $r[$attribute];
+                }
+                $value = $multiple;
               }
-              $value = $multiple;
+              $attributes[$attribute] = $value;
             }
-            $attributes[$attribute] = $value;
+            return $this->normalize($attributes, $class)->then(function (
+              $attributes) use ($class) {
+              return new $class($attributes);
+            });
           }
-          $this->normalize($attributes, $class);
-          $models[] = new $class($attributes);
-        }
+        });
       }
-    } catch (Exception $e) {
-      return Promise\When::reject($e);
-    }
-    return empty($models) ? Promise\When::reject()
-      : Promise\When::resolve($models);
+      return Promise\When::all($promises);
+    });
   }
 
-  public function purge($class) {
+  public function purge($class, $search = array(), $options = array()) {
     $table = $this->tableName($class);
-    $this->query("TRUNCATE TABLE `{$table}`");
-    return Promise\When::resolve();
+    if (empty($search) && empty($options)) {
+      $this->query("TRUNCATE TABLE `{$table}`");
+      return Promise\When::resolve();
+    }
+    return $this->select($class, $search, $options)->then(function ($rows) use (
+      $table) {
+      $promises = array();
+      foreach ($rows as $row) {
+        $promises[] = $this->denormalizeSearch($class, array($row))->then(function (
+          $where) use ($table) {
+          $query = "DELETE FROM `{$table}` WHERE {$where}";
+          return $this->query($query);
+        });
+      }
+      return Promise\When::all($promises);
+    });
   }
 
   protected function projection($table) {
@@ -211,26 +215,26 @@ class MySQL implements Interfaces\Database {
   }
 
   protected function select($class, $search = array(), $options = array()) {
-    $where = $this->normalizeSearch($class, array(
-      $search
-    ));
-    $options = $this->options($options);
-    $tables = $this->tablesFor($class);
-    $table = array_shift($tables);
-    $projection = $this->projection($table);
-    $key = implode('`, `', $class::$key);
-    $joins = $tables ? "LEFT JOIN `"
-        . implode("` USING (`$key`) LEFT JOIN `", $tables) . "` USING (`$key`)"
-      : '';
-    $projection = implode("`, `$table`.`", $class::$key);
-    $query = "SELECT `{$table}`.`{$projection}` FROM `{$table}` {$joins} "
-      . "WHERE {$where} GROUP BY `{$table}`.`{$projection}` {$options}";
-    return $this->query($query);
+    return $this->denormalizeSearch($class, array($search))->then(function (
+      $where) use ($class, $options) {
+      $options = $this->options($options);
+      $tables = $this->tablesFor($class);
+      $table = array_shift($tables);
+      $projection = $this->projection($table);
+      $key = implode('`, `', (array) CM::get($class, 'keys'));
+      $joins = $tables ? "LEFT JOIN `"
+          . implode("` USING (`$key`) LEFT JOIN `", $tables)
+          . "` USING (`$key`)" : '';
+      $projection = implode("`, `$table`.`", CM::get($class, 'keys'));
+      $query = "SELECT `{$table}`.`{$projection}` FROM `{$table}` {$joins} "
+        . "WHERE {$where} GROUP BY `{$table}`.`{$projection}` {$options}";
+      return $this->query($query);
+    });
   }
 
   protected function denormalize(&$document, $class) {
     foreach ($document as $field => &$value) {
-      if ($class::get("attributes.$field.multiple") && is_array($value)) {
+      if (CM::get($class, "attributes.$field.multiple") && is_array($value)) {
         foreach ($value as &$v) {
           $this->denormalizeValue($v, $field, $class);
         }
@@ -246,19 +250,19 @@ class MySQL implements Interfaces\Database {
       $value = 'NULL';
       return;
     }
-    if ($value instanceof Bread\Model) {
-      $value->store();
+    if ($value instanceof DateTime) {
+      $value = $value->format(self::DATETIME_FORMAT);
+    }
+    elseif (is_object($value)) {
+      Database::driver(get_class($value))->store($value);
       $reference = new Database\Reference($value);
       $value = json_encode($reference);
     }
-    elseif ($value instanceof DateTime) {
-      $value = $value->format(self::DATETIME_FORMAT);
-    }
-    elseif (strcasecmp($class::get("attributes.$field.type"), 'point') == 0) {
+    elseif (CM::get($class, "attributes.$field.type") === 'point') {
       $value = "GEOMFROMTEXT('POINT(" . implode(" ", $value) . ")')";
       return;
     }
-    elseif (strcasecmp($class::get("attributes.$field.type"), 'polygon') == 0) {
+    elseif (CM::get($class, "attributes.$field.type") === 'polygon') {
       $polygon = [];
       foreach ($value as $point) {
         $polygon[] = implode(" ", $point);
@@ -277,97 +281,106 @@ class MySQL implements Interfaces\Database {
     }
   }
 
-  protected function normalize(&$document, $class) {
+  protected function normalize($document, $class) {
+    $promises = array();
     foreach ($document as $field => &$value) {
       if (is_array($value)) {
-        foreach ($value as &$v) {
-          $this->normalizeValue($v, $field, $class);
-        }
+        $promises[$field] = $this->normalize($value, $class);
         continue;
       }
-      elseif ($value) {
-        $this->normalizeValue($value, $field, $class);
-      }
-    }
-  }
-
-  protected function normalizeValue(&$value, $field, $class) {
-    switch ($class::get("attributes.$field.type")) {
-    case 'number':
-      $step = $class::get("attributes.$field.step");
-      $value = (preg_match('/^any$|\./', $step)) ? (float) $value : (int) $value;
-      break;
-    case 'month':
-    case 'week':
-    case 'time':
-    case 'date':
-    case 'datetime':
-    case 'datetime-local':
-      $value = new DateTime($value);
-      break;
-    case 'point':
-      preg_match('/POINT\((\S+) (\S+)\)/', $value, $matches);
-      $value = array(
-        (double) $matches[1], (double) $matches[2]
-      );
-      break;
-    case 'polygon':
-      preg_match('/^POLYGON\((.+)\)$/', $value, $matches);
-      $value = array();
-      foreach (preg_split('/\),\(/', $matches[1]) as $linestring) {
-        foreach (preg_split('/,/', trim($linestring, '()')) as $point) {
-          $value[] = array_map('floatval', preg_split('/ /', $point));
+      switch (CM::get($class, "attributes.$field.type")) {
+      case 'number':
+        $step = $class::get("attributes.$field.step");
+        $value = (preg_match('/^any$|\./', $step)) ? (float) $value
+          : (int) $value;
+        break;
+      case 'month':
+      case 'week':
+      case 'time':
+      case 'date':
+      case 'datetime':
+      case 'datetime-local':
+        $value = new DateTime($value);
+        break;
+      case 'point':
+        preg_match('/POINT\((\S+) (\S+)\)/', $value, $matches);
+        $value = array((double) $matches[1], (double) $matches[2]);
+        break;
+      case 'polygon':
+        preg_match('/^POLYGON\((.+)\)$/', $value, $matches);
+        $value = array();
+        foreach (preg_split('/\),\(/', $matches[1]) as $linestring) {
+          foreach (preg_split('/,/', trim($linestring, '()')) as $point) {
+            $value[] = array_map('floatval', preg_split('/ /', $point));
+          }
         }
+        break;
       }
-      break;
+      if (Database\Reference::is($value)) {
+        $promises[$field] = Database\Reference::fetch($value);
+      }
     }
-    if (Database\Reference::is($value)) {
-      Database\Reference::fetch($value)->then(function ($model) use (&$value) {
-        $value = $model;
-      });
-    }
+    return Promise\When::all($promises, function ($values) use ($document) {
+      foreach ($values as $field => $value) {
+        $document[$field] = $value;
+      }
+      return $document;
+    });
   }
 
-  protected function normalizeSearch($class, $conditions = array(),
+  protected function denormalizeSearch($class, $conditions = array(),
     $logic = '$and', $op = '=') {
     $where = array();
+    $promises = array();
     foreach ($conditions as $search) {
-      $w = array();
       foreach ($search as $attribute => $condition) {
         switch ($attribute) {
         case '$and':
         case '$or':
-          $where[] = "("
-            . $this->normalizeSearch($class, $condition, $attribute) . ")";
+          $where[] = $this->denormalizeSearch($class, $condition, $attribute)->then(function (
+            $where) {
+            return "({$where})";
+          });
           continue 2;
         case '$nor':
-          $where[] = "NOT ("
-            . $this->normalizeSearch($class, $condition, '$or') . ")";
+          $where[] = $this->denormalizeSearch($class, $condition, '$or')->then(function (
+            $where) {
+            return "NOT ({$where})";
+          });
           continue 2;
         default:
           $explode = explode('.', $attribute);
           $attribute = array_shift($explode);
           if ($explode) {
-            $type = $class::get("attributes.$attribute.type");
-            $type::fetch(array(
-              implode('.', $explode) => $condition
-            ))->then(function ($models) use (&$condition) {
-              $condition = array(
-                '$in' => $models
-              );
-            });
+            $type = CM::get($class, "attributes.$attribute.type");
+            if (CL::classExists($type)) {
+              $promises[$attribute] = Database::driver($type)->fetch($type, array(
+                implode('.', $explode) => $condition
+              ))->then(function ($models) {
+                return array('$in' => $models);
+              });
+            }
           }
+          else {
+            $promises[$attribute] = Promise\When::resolve($condition);
+          }
+        }
+      }
+      $where[] = Promise\When::all($promises, function ($conditions) use (
+        $class, $op) {
+        $w = array();
+        foreach ($conditions as $attribute => $condition) {
           if (is_array($condition)) {
             $c = array();
             foreach ($condition as $k => $v) {
               switch ($k) {
               case '$in':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = "`$attribute` IN (" . implode(" , ", $v) . ")";
+                $c[] = "`$attribute` IN (" . implode(", ", $v) . ")";
                 continue 2;
               case '$nin':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = "`$attribute` NOT IN (" . implode(" , ", $v) . ")";
+                $c[] = "`$attribute` NOT IN (" . implode(", ", $v) . ")";
                 continue 2;
               case '$lt':
                 $op = '<';
@@ -384,22 +397,18 @@ class MySQL implements Interfaces\Database {
               case '$ne':
                 $op = 'IS NOT';
                 break;
+              case '$regex':
+                $op = 'REGEXP';
+                break;
               case '$all':
                 $all = array_map(function ($value) use ($attribute) {
-                  return array(
-                    $attribute => $value
-                  );
+                  return array($attribute => $value);
                 }, $v);
-                $c[] = $this->normalizeSearch($class, $all, '$or');
+                $c[] = $this->denormalizeSearch($class, $all, '$or');
                 continue 2;
               case '$not':
-                $not = array(
-                  $attribute => $v
-                );
-                $c[] = "NOT "
-                  . $this->normalizeSearch($class, array(
-                    $not
-                  ));
+                $not = array($attribute => $v);
+                $c[] = "NOT " . $this->denormalizeSearch($class, array($not));
                 continue 2;
               case '$maxDistance':
               case '$uniqueDocs':
@@ -449,15 +458,15 @@ class MySQL implements Interfaces\Database {
               $op = '=';
             }
             $w[] = "(" . implode(" AND ", $c) . ")";
-            continue 2;
+            continue;
           }
           is_null($condition) && $op = 'IS';
           $this->denormalizeValue($condition, $attribute, $class);
           $w[] = "`$attribute` $op $condition";
           $op = '=';
         }
-      }
-      empty($w) || $where[] = implode(" AND ", $w);
+        return implode(" AND ", $w);
+      });
     }
     switch ($logic) {
     case '$and':
@@ -467,8 +476,9 @@ class MySQL implements Interfaces\Database {
       $logic = 'OR';
       break;
     }
-    $where = implode(" $logic ", $where);
-    return $where ? "$where" : '1';
+    return Promise\When::all($where, function ($where) use ($logic) {
+      return implode(" $logic ", $where) ? : '1';
+    });
   }
 
   protected function options($options = array()) {
@@ -478,9 +488,7 @@ class MySQL implements Interfaces\Database {
       case 'sort':
         $sort = array();
         if (!is_array($value)) {
-          $value = array(
-            $value => 1
-          );
+          $value = array($value => 1);
         }
         foreach ($value as $k => $s) {
           if (is_numeric($k)) {
@@ -513,9 +521,20 @@ class MySQL implements Interfaces\Database {
     return implode(' ', $return);
   }
 
+  protected function keys($object) {
+    $class = get_class($object);
+    $keys = array();
+    foreach ((array) CM::get($class, 'keys') as $key) {
+      $keys[$key] = $object->$key;
+    }
+    return $keys;
+  }
+
   protected function describe($table) {
     $keys = array(
-      'primary' => array(), 'unique' => array(), 'indexes' => array()
+      'primary' => array(),
+      'unique' => array(),
+      'indexes' => array()
     );
     $fields = array();
     foreach ($this->tables($table) as $table) {
@@ -540,22 +559,12 @@ class MySQL implements Interfaces\Database {
         }
       }
     }
-    return array(
-      'fields' => $fields, 'keys' => $keys
-    );
+    return array('fields' => $fields, 'keys' => $keys);
   }
 
   protected function type($table, $column) {
     $describe = $this->describe($table);
     return $describe['fields'][$column]['type'];
-  }
-
-  protected function keys($table, $primaryOnly = true) {
-    $describe = $this->describe($table);
-    if ($primaryOnly) {
-      return $describe['keys']['primary'];
-    }
-    return $describe;
   }
 
   protected function columns($table) {
@@ -590,10 +599,13 @@ class MySQL implements Interfaces\Database {
       $this->query("INSERT INTO `" . self::INDEX_TABLE
         . "` VALUES ('%s', '%s')", $class, $table);
     }
-    $key = implode('`, `', $class::$key);
     if (!$this->tableExists($table)) {
+      $key = implode('`, `', CM::get($class, 'keys'));
       $model = new $class();
-      $attributes = $model->attributes();
+      $attributes = array();
+      foreach ($model as $attribute => $value) {
+        $attributes[$attribute] = $value;
+      }
       $queries = array();
       $query = "CREATE TABLE IF NOT EXISTS `$table` (\n\t";
       $multiples = array();
@@ -609,7 +621,7 @@ class MySQL implements Interfaces\Database {
       $queries[] = $query;
       foreach ($multiples as $column) {
         $query = "CREATE TABLE IF NOT EXISTS `{$table}_{$column}` (\n\t";
-        foreach ($class::$key as $k) {
+        foreach ((array) CM::get($class, 'keys') as $k) {
           $query .= $this->createQuery($class, $k);
         }
         $query .= "`_` INT unsigned NOT NULL DEFAULT 0,\n\t";
@@ -636,6 +648,9 @@ class MySQL implements Interfaces\Database {
 
   protected function tableName($class) {
     $class = is_object($class) ? get_class($class) : $class;
+    if ($tableName = CM::get($class, 'database.mysql.table')) {
+      return $tableName;
+    }
     $query = "SELECT * FROM `" . self::INDEX_TABLE . "` WHERE `class` = '%s'";
     $results = $this->query($query, $class);
     $result = array_shift($results);

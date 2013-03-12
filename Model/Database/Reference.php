@@ -65,6 +65,7 @@ class Reference {
       $reference = (object) $reference;
     }
     $class = $reference->_class;
-    return Database::driver($class)->first($class, $reference->_key);
+    $search = $reference->_key;
+    return Database::driver($class)->first($class, $search);
   }
 }

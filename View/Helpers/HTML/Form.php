@@ -19,9 +19,7 @@ class Form extends Node {
   public function __construct(Page $page, $action = null, $method = 'post') {
     parent::__construct($page, 'form');
     $this->addClass('form-horizontal');
-    $this->attr(array(
-      'action' => $action, 'method' => $method
-    ));
+    $this->attr(array('action' => $action, 'method' => $method));
   }
 
   public function __call($type, $arguments) {
@@ -73,10 +71,24 @@ class Form extends Node {
   public function actions($actions = array()) {
     $formActions = $this->append('div.form-actions');
     foreach ($actions as $type => $action) {
-      $formActions->append('button', $action)->attr(array(
-        'type' => $type, 'class' => 'btn'
-      ));
+      if ($action instanceof Node) {
+        $formActions->append($action);
+      }
+      else {
+        $formActions->append('button', $action)->attr(array(
+          'type' => $type,
+          'class' => 'btn'
+        ));
+      }
     }
+  }
+
+  public function submit($name, $label, $attributes = array()) {
+    return $this->append('button', $label, $attributes)->attr(array(
+      'class' => 'btn',
+      'type' => 'submit',
+      'name' => $name
+    ));
   }
 
   public function text($text) {

@@ -21,7 +21,6 @@ use Bread\Model\Database;
 use Bread\Promise;
 use Exception;
 use DateTime;
-use ArrayObject;
 use MongoClient, MongoCollection, MongoCursor, MongoId, MongoCode, MongoDate;
 use MongoBinData, MongoRegex, MongoDBRef;
 
@@ -41,22 +40,31 @@ class MongoDB implements Database\Interfaces\Driver {
     $this->connection->close();
   }
 
-  public function store(&$object) {
+  public function store($object) {
     $class = get_class($object);
     $keys = $this->keys($object);
-    $document = (array) $object;
-    $this->denormalizeDocument($document);
+    $document = array();
+    // TODO protected method to extract object attributes
+    foreach ($object as $field => $value) {
+      $document[$field] = $value;
+    }
     $this->denormalizeDocument($keys);
+    $this->denormalizeDocument($document);
     $collection = $this->collection($class);
-    $collection->update($keys, $document, array(
-      'upsert' => true,
-      'multiple' => false
-    ));
+    try {
+      $collection->update($keys, $document, array(
+        'upsert' => true,
+        'multiple' => false
+      ));
+    } catch (Exception $e) {
+      // FIXME rethrow exception?
+      return Promise\When::reject($e);
+    }
     $this->ensureIndexes($class, array_keys($keys));
     return Promise\When::resolve($object);
   }
 
-  public function delete(&$object) {
+  public function delete($object) {
     $class = get_class($object);
     $keys = $this->keys($object);
     $this->denormalizeDocument($keys);
@@ -81,15 +89,12 @@ class MongoDB implements Database\Interfaces\Driver {
       $class) {
       $normalized = array();
       foreach ($documents as $document) {
-        $normalized[] = $this->normalizeDocument($document);
+        $normalized[] = $this->normalizeDocument($document)->then(function (
+          $document) use ($class) {
+          return new $class($document);
+        });
       }
-      return Promise\When::all($normalized, function ($documents) use ($class) {
-        $objects = array();
-        foreach ($documents as $document) {
-          $objects[] = new $class($document);
-        }
-        return new ArrayObject($objects);
-      });
+      return Promise\When::all($normalized);
     });
   }
 
@@ -186,6 +191,7 @@ class MongoDB implements Database\Interfaces\Driver {
         $value = new MongoDate($value->format(self::DATETIME_FORMAT));
       }
       elseif (is_object($value)) {
+        Database::driver(get_class($value))->store($value);
         $value = new Database\Reference($value);
       }
       elseif (is_array($value)) {

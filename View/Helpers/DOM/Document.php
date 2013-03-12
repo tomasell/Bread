@@ -30,6 +30,8 @@ class Document {
     $this->doctype = $this->implementation->createDocumentType($qualifiedName, $publicId, $systemId);
     $this->document = $this->implementation->createDocument($namespace, $qualifiedName, $this->doctype);
     $this->document->encoding = 'utf-8';
+    $this->document->preserveWhiteSpace = false;
+    $this->document->formatOutput = true;
     $this->xpath = new DOMXPath($this->document);
     $this->root = new Node($this, $this->document->documentElement);
   }
@@ -53,7 +55,7 @@ class Document {
     $this->xpath = new DOMXPath($this->document);
     $this->root = new Node($this, $this->document->documentElement);
   }
-  
+
   public function create($name, $value = null, $attributes = array()) {
     $element = $this->document->createElement($name);
     foreach ($attributes as $name => $value) {

@@ -39,7 +39,7 @@ class Dispatcher {
       return Promise\When::resolve(call_user_func_array($callback, $arguments));
     })->then(function ($output) use ($response) {
       $response->end($output);
-    }, function (Exception $exception) use ($response) {
+    }, function (\Exception $exception) use ($response) {
       $response->status($exception->getCode());
       $response->end($exception->getMessage());
     });

@@ -201,28 +201,46 @@ class MongoDB implements Database\Interfaces\Driver {
   }
 
   protected function denormalizeSearch($class, $search) {
+    $recursion = array();
     $promises = array();
     foreach ($search as $field => &$condition) {
-      $key = $field;
-      $explode = explode('.', $field);
-      $field = array_shift($explode);
-      if ($explode) {
-        $type = CM::get($class, "attributes.$field.type");
-        if (CL::classExists($type)) {
-          unset($search[$key]);
-          $promises[$field] = Database::driver($type)->fetch($type, array(
-            implode('.', $explode) => $condition
-          ));
+      switch ($field) {
+      case '$and':
+      case '$or':
+      case '$not':
+        $recursion[$field] = array();
+        foreach ($condition as $c) {
+          $recursion[$field][] = $this->denormalizeSearch($class, $c);
+        }
+        break;
+      default:
+        $key = $field;
+        $explode = explode('.', $field);
+        $field = array_shift($explode);
+        if ($explode) {
+          $type = CM::get($class, "attributes.$field.type");
+          if (CL::classExists($type)) {
+            unset($search[$key]);
+            $promises[$field] = Database::driver($type)->fetch($type, array(
+              implode('.', $explode) => $condition
+            ));
+          }
         }
       }
     }
-    // TODO recursion for $and, $or, $not logics
-    return Promise\When::all($promises, function ($conditions) use ($search) {
-      foreach ($conditions as $field => $value) {
-        $search[$field] = array('$in' => (array) $value);
+    return Promise\When::all($recursion, function ($s) use ($search) {
+      foreach ($s as $logic => $conditions) {
+        $search[$logic] = $conditions;
       }
-      $this->denormalizeDocument($search);
       return $search;
+    })->then(function ($search) use ($promises) {
+      return Promise\When::all($promises, function ($conditions) use ($search) {
+        foreach ($conditions as $field => $value) {
+          $search[$field] = array('$in' => (array) $value);
+        }
+        $this->denormalizeDocument($search);
+        return $search;
+      });
     });
   }
 

@@ -331,8 +331,8 @@ class MySQL implements Database\Interfaces\Driver {
   protected function denormalizeSearch($class, $conditions = array(),
     $logic = '$and', $op = '=') {
     $where = array();
-    $promises = array();
     foreach ($conditions as $search) {
+      $promises = array();
       foreach ($search as $attribute => $condition) {
         switch ($attribute) {
         case '$and':
@@ -376,11 +376,11 @@ class MySQL implements Database\Interfaces\Driver {
               switch ($k) {
               case '$in':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = "`$attribute` IN (" . implode(", ", $v) . ")";
+                $c[] = Promise\When::resolve("`$attribute` IN (" . implode(", ", $v) . ")");
                 continue 2;
               case '$nin':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = "`$attribute` NOT IN (" . implode(", ", $v) . ")";
+                $c[] = Promise\When::resolve("`$attribute` NOT IN (" . implode(", ", $v) . ")");
                 continue 2;
               case '$lt':
                 $op = '<';
@@ -408,7 +408,9 @@ class MySQL implements Database\Interfaces\Driver {
                 continue 2;
               case '$not':
                 $not = array($attribute => $v);
-                $c[] = "NOT " . $this->denormalizeSearch($class, array($not));
+                $c[] = $this->denormalizeSearch($class, array($not))->then(function($c) {
+                  return "NOT {$c}";
+                });
                 continue 2;
               case '$maxDistance':
               case '$uniqueDocs':
@@ -421,7 +423,7 @@ class MySQL implements Database\Interfaces\Driver {
                 $pointD = $v[0] . " " . ($v[1] + $maxDistance);
                 $polygon = "($pointA,$pointB,$pointC,$pointD,$pointA)";
                 $shape = "GeomFromText('Polygon($polygon)')";
-                $c[] = "Within($attribute,$shape)";
+                $c[] = Promise\When::resolve("Within($attribute,$shape)");
                 continue 2;
               case '$within':
                 switch (key($v)) {
@@ -449,23 +451,27 @@ class MySQL implements Database\Interfaces\Driver {
                   break;
                 }
                 $shape = "GeomFromText('Polygon($polygon)')";
-                $c[] = "Within($attribute,$shape)";
+                $c[] = Promise\When::resolve("Within($attribute,$shape)");
                 continue 2;
               }
               is_null($v) && $op = 'IS';
               $this->denormalizeValue($v, $attribute, $class);
-              $c[] = "`$attribute` $op $v";
+              $c[] = Promise\When::resolve("`$attribute` $op $v");
               $op = '=';
             }
-            $w[] = "(" . implode(" AND ", $c) . ")";
+            $w[] = Promise\When::all($c, function($c) {
+              return "(" . implode(" AND ", $c) . ")";
+            });
             continue;
           }
           is_null($condition) && $op = 'IS';
           $this->denormalizeValue($condition, $attribute, $class);
-          $w[] = "`$attribute` $op $condition";
+          $w[] = Promise\When::resolve("`$attribute` $op $condition");
           $op = '=';
         }
-        return implode(" AND ", $w);
+        return Promise\When::all($w, function($w) {
+          return implode(" AND ", $w);
+        });
       });
     }
     switch ($logic) {

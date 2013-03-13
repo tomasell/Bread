@@ -28,7 +28,7 @@ class Router {
     foreach ($routes as $route) {
       $route = new Route\Model($route);
       if (preg_match($route->pattern, $request->uri, $matches)) {
-        if ($matches['controller']) {
+        if (isset($matches['controller'])) {
           $ns = explode('/', $matches['controller']);
           $ns = array_map('Bread\L10n\Inflector::camelize', $ns);
           $matches['controller'] = implode(NS, $ns);

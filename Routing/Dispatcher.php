@@ -15,11 +15,12 @@
 
 namespace Bread\Routing;
 
+use Bread\Networking\HTTP;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
-use Bread\Networking\HTTP\Exception;
 use Bread\Networking\HTTP\Client\Exceptions;
 use Bread\Promise;
+use Exception;
 
 class Dispatcher {
   public function dispatch(Request $request, Response $response) {
@@ -39,8 +40,13 @@ class Dispatcher {
       return Promise\When::resolve(call_user_func_array($callback, $arguments));
     })->then(function ($output) use ($response) {
       $response->end($output);
-    }, function (\Exception $exception) use ($response) {
-      $response->status($exception->getCode());
+    }, function (Exception $exception) use ($response) {
+      if ($exception instanceof HTTP\Exception) {
+        $response->status($exception->getCode());
+      }
+      else {
+        $response->status(500);
+      }
       $response->end($exception->getMessage());
     });
   }

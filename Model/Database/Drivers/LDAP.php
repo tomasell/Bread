@@ -18,20 +18,23 @@ namespace Bread\Model\Database\Drivers;
 use Bread\Configuration\Manager as CM;
 use Bread\Model\Database;
 use Bread\Promise;
+use Bread;
 use ArrayObject;
 
 class LDAP implements Database\Interfaces\Driver {
   const DEFAULT_PORT = 389;
   const DATETIME_FORMAT = 'U';
-  const FILTER_ALL = '(objectClass=*)';
+  const FILTER_ALL = 'objectClass=*';
 
   protected $link;
   protected $base;
+  protected $filter;
 
   public function __construct($url) {
     $conn = array_merge(array(
       'host' => 'localhost',
-      'port' => self::DEFAULT_PORT
+      'port' => self::DEFAULT_PORT,
+      'query' => self::FILTER_ALL
     ), parse_url($url));
     if (!$this->link = ldap_connect($conn['host'], $conn['port'])) {
       throw new Exception("Cannot connect to LDAP server {$conn['host']}");
@@ -41,6 +44,7 @@ class LDAP implements Database\Interfaces\Driver {
       ldap_bind($this->link, $conn['user'], $conn['pass']);
     }
     $this->base = ltrim($conn['path'], '/');
+    parse_str($conn['query'], $this->filter);
   }
 
   public function __destruct() {
@@ -107,16 +111,13 @@ class LDAP implements Database\Interfaces\Driver {
       }
       do {
         if ($entry = ldap_get_attributes($this->link, $result)) {
-          $normalized[] = $this->normalizeEntry($class, $entry);
+          $normalized[] = $this->normalizeEntry($class, $entry)->then(function (
+            $attributes) use ($class) {
+            return new $class($attributes);
+          });
         }
       } while ($result = ldap_next_entry($this->link, $result));
-      return Promise\When::all($normalized, function ($entries) use ($class) {
-        $objects = array();
-        foreach ($entries as $attributes) {
-          $objects[] = new $class($attributes);
-        }
-        return new ArrayObject($objects);
-      });
+      return Promise\When::all($normalized);
     });
   }
 
@@ -135,8 +136,11 @@ class LDAP implements Database\Interfaces\Driver {
   }
 
   protected function search($class, $search = array(), $options = array()) {
-    $filter = $this->denormalizeSearch($class, array($search));
-    return $this->options(ldap_search($this->link, $this->base, $filter), $options);
+    return $this->denormalizeSearch($class, array($this->filter, $search))->then(function (
+      $filter) use ($options) {
+      return $this->options(ldap_search($this->link, $this->base, "({$filter})"), $options);
+    });
+
   }
 
   protected function options($search, $options = array()) {
@@ -159,17 +163,39 @@ class LDAP implements Database\Interfaces\Driver {
         continue;
       }
       unset($value['count']);
-      if (!CM::get($class, "attributes.$attribute.multiple")) {
-        $value = array_shift($value);
+      $normalizedValues = array();
+      foreach ($value as $v) {
+        if ($this->isDistinguishedName($v)) {
+          if ($result = ldap_search($this->link, $v, self::FILTER_ALL)) {
+            $newClass = CM::get($class, "attributes.$attribute.type");
+            $newEntry = ldap_first_entry($this->link, $result);
+            $newEntry = ldap_get_attributes($this->link, $newEntry);
+            $normalizedValues[] = $this->normalizeEntry($newClass, $newEntry)->then(function (
+              $attributes) use ($newClass) {
+              return new $newClass($attributes);
+            });
+          }
+        }
+        else {
+          $normalizedValues[] = Promise\When::resolve($v);
+        }
       }
-      $explode = explode(';', $attribute);
-      $attribute = array_shift($explode);
-      foreach ((array) $explode as $tag) {
-        // TODO tagged attributes
-      }
-      $normalized[$attribute] = $value;
+      $normalized[$attribute] = Promise\When::all($normalizedValues);
     }
-    return Promise\When::resolve($normalized);
+    return Promise\When::all($normalized)->then(function ($normalized) use (
+      $class) {
+      foreach ($normalized as $attribute => &$values) {
+        if (!CM::get($class, "attributes.$attribute.multiple")) {
+          $values = array_shift($values);
+        }
+      }
+      return $normalized;
+    });
+    // TODO tagged attributes
+    //$explode = explode(';', $attribute);
+    //$attribute = array_shift($explode);
+    //foreach ((array) $explode as $tag) {
+    //}
   }
 
   protected function denormalizeEntry(&$entry) {
@@ -187,8 +213,10 @@ class LDAP implements Database\Interfaces\Driver {
           $where[] = $this->denormalizeSearch($class, $condition, $attribute);
           continue 2;
         case '$nor':
-          $where[] = "!(" . $this->denormalizeSearch($class, $condition, '$or')
-            . ")";
+          $where[] = $this->denormalizeSearch($class, $condition, '$or')->then(function (
+            $where) {
+            return "!({$where})";
+          });
           continue 2;
         default:
           if (is_array($condition)) {
@@ -209,8 +237,10 @@ class LDAP implements Database\Interfaces\Driver {
                 foreach ($value as $v) {
                   $nin[] = array($attribute => $v);
                 }
-                $c[] = "!(" . $this->denormalizeSearch($class, $nin, '$or')
-                  . ")";
+                $c[] = $this->denormalizeSearch($class, $nin, '$or')->then(function (
+                  $c) {
+                  return "!({$c})";
+                });
                 continue 2;
               case '$lt':
                 $op = '<';
@@ -231,11 +261,14 @@ class LDAP implements Database\Interfaces\Driver {
                 $all = array_map(function ($value) use ($attribute) {
                   return array($attribute => $value);
                 }, $value);
-                $c[] = $this->normalizeSearch($class, $all, '$or');
+                $c[] = $this->denormalizeSearch($class, $all, '$or');
                 continue 2;
               case '$not':
                 $not = array($attribute => $value);
-                $c[] = "!(" . $this->normalizeSearch($class, array($not)) . ")";
+                $c[] = $this->denormalizeSearch($class, array($not))->then(function (
+                  $c) {
+                  return "!({$c})";
+                });
                 continue 2;
               case '$maxDistance':
               case '$uniqueDocs':
@@ -245,7 +278,7 @@ class LDAP implements Database\Interfaces\Driver {
               }
               is_null($value) && $op = 'IS';
               $this->denormalizeValue($value, $attribute, $class);
-              $c[] = $prefix . $attribute . $op . $value;
+              $c[] = Promise\When::resolve($prefix . $attribute . $op . $value);
               $op = '=';
             }
             switch (count($c)) {
@@ -255,13 +288,15 @@ class LDAP implements Database\Interfaces\Driver {
               $w[] = array_shift($c);
               break;
             default:
-              $w[] = "&(" . implode(")(", $c) . ")";
+              $w[] = Promise\When::all($c, function ($c) {
+                return "&(" . implode(")(", $c) . ")";
+              });
             }
             continue 2;
           }
           is_null($condition) && $op = 'IS';
           $this->denormalizeValue($condition, $attribute, $class);
-          $w[] = $prefix . $attribute . $op . $condition;
+          $w[] = Promise\When::resolve($prefix . $attribute . $op . $condition);
           $op = '=';
         }
       }
@@ -272,7 +307,9 @@ class LDAP implements Database\Interfaces\Driver {
         $where[] = array_shift($w);
         break;
       default:
-        $where[] = "&(" . implode(")(", $w) . ")";
+        $where[] = Promise\When::all($w, function ($w) {
+          return "&(" . implode(")(", $w) . ")";
+        });
       }
     }
     switch ($logic) {
@@ -292,11 +329,17 @@ class LDAP implements Database\Interfaces\Driver {
     case 1:
       return array_shift($where);
     default:
-      return "({$logic}(" . implode(")(", $where) . "))";
+      return Promise\When::all($where, function ($where) use ($logic) {
+        return "{$logic}(" . implode(")(", $where) . ")";
+      });
     }
   }
 
   protected function denormalizeValue() {
+  }
+
+  protected function isDistinguishedName($dn) {
+    return (bool) preg_match('/^(\w+=[\s\w]+)(,\w+=[\s\w]+)*$/', $dn);
   }
 
   protected function dn($object) {

@@ -31,13 +31,6 @@ abstract class View {
 
   public function compose(HTML\Page $page) {
     foreach ($page('[data-bread-block]') as $block) {
-      $uri = $block->attr('data-bread-block');
-      $router = new Router();
-      $router->route($this->request, $uri)->then(function ($callback) {
-        return call_user_func($callback)->then(function($response) {
-          
-        });
-      });
     }
     foreach ($this->response->messages as $severity => $messages) {
       foreach ($messages as $message) {

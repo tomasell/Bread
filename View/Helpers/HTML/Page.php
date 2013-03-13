@@ -41,7 +41,6 @@ class Page extends DOM\Document {
   }
 
   public function __toString() {
-    $this->compose();
     return parent::__toString();
   }
 

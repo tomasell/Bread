@@ -141,7 +141,8 @@ class LDAP implements Database\Interfaces\Driver {
   protected function search($class, $search = array(), $options = array()) {
     return $this->denormalizeSearch($class, array($this->filter, $search))->then(function (
       $filter) use ($options) {
-      return $this->options(ldap_search($this->link, $this->base, $filter), $options);
+      return $this->options(ldap_search($this->link, $this->base, "(" . $filter
+        . ")"), $options);
     });
 
   }
@@ -178,7 +179,7 @@ class LDAP implements Database\Interfaces\Driver {
           }
         }
         else {
-          $normalizedValues[] = Promise\When::resolve($value);
+          $normalizedValues[] = Promise\When::resolve($v);
         }
       }
       $normalized[$attribute] = Promise\When::all($normalizedValues);
@@ -187,7 +188,6 @@ class LDAP implements Database\Interfaces\Driver {
       $class) {
       foreach ($normalized as $attribute => &$values) {
         if (!CM::get($class, "attributes.$attribute.multiple")) {
-          $values = array_shift($values);
           $values = array_shift($values);
         }
       }
@@ -268,7 +268,7 @@ class LDAP implements Database\Interfaces\Driver {
                 $all = array_map(function ($value) use ($attribute) {
                   return array($attribute => $value);
                 }, $value);
-                $c[] = $this->normalizeSearch($class, $all, '$or');
+                $c[] = $this->denormalizeSearch($class, $all, '$or');
                 continue 2;
               case '$not':
                 $not = array($attribute => $value);
@@ -285,7 +285,6 @@ class LDAP implements Database\Interfaces\Driver {
               }
               is_null($value) && $op = 'IS';
               $this->denormalizeValue($value, $attribute, $class);
-              //$c[] = $prefix . $attribute . $op . $value;
               $c[] = Promise\When::resolve($prefix . $attribute . $op . $value);
               $op = '=';
             }
@@ -296,7 +295,6 @@ class LDAP implements Database\Interfaces\Driver {
               $w[] = array_shift($c);
               break;
             default:
-            //$w[] = "&(" . implode(")(", $c) . ")";
               $w[] = Promise\When::all($c, function ($c) {
                 return "&(" . implode(")(", $c) . ")";
               });
@@ -305,7 +303,6 @@ class LDAP implements Database\Interfaces\Driver {
           }
           is_null($condition) && $op = 'IS';
           $this->denormalizeValue($condition, $attribute, $class);
-          //$w[] = $prefix . $attribute . $op . $condition;
           $w[] = Promise\When::resolve($prefix . $attribute . $op . $condition);
           $op = '=';
         }
@@ -317,7 +314,6 @@ class LDAP implements Database\Interfaces\Driver {
         $where[] = array_shift($w);
         break;
       default:
-      //$where[] = "&(" . implode(")(", $w) . ")";
         $where[] = Promise\When::all($w, function ($w) {
           return "&(" . implode(")(", $w) . ")";
         });
@@ -340,9 +336,8 @@ class LDAP implements Database\Interfaces\Driver {
     case 1:
       return array_shift($where);
     default:
-    //return "({$logic}(" . implode(")(", $where) . "))";
       return Promise\When::all($where, function ($where) use ($logic) {
-        return "({$logic}(" . implode(")(", $where) . "))";
+        return "{$logic}(" . implode(")(", $where) . ")";
       });
     }
   }

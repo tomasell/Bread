@@ -32,7 +32,6 @@ class MySQL implements Database\Interfaces\Driver {
   const MAX_LIMIT = '18446744073709551615';
 
   protected $database;
-  protected $url;
   protected $link;
 
   public function __construct($url) {
@@ -93,8 +92,9 @@ class MySQL implements Database\Interfaces\Driver {
           foreach ($attribute as $k => $value) {
             $values[] = implode(', ', array_merge($key, array($k, $value)));
           }
-          $where = $this->denormalizeSearch($class, array($key));
-          $this->query("DELETE FROM `{$table}` WHERE $where AND `_` >= %d", count($attribute));
+          $this->denormalizeSearch($class, array($key))->then(function($where) use ($table, $attribute) {
+            $this->query("DELETE FROM `{$table}` WHERE $where AND `_` >= %d", count($attribute));
+          });
         }
         else {
           $values[] = implode(', ', $fields);
@@ -376,11 +376,13 @@ class MySQL implements Database\Interfaces\Driver {
               switch ($k) {
               case '$in':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = Promise\When::resolve("`$attribute` IN (" . implode(", ", $v) . ")");
+                $c[] = Promise\When::resolve("`$attribute` IN ("
+                  . implode(", ", $v) . ")");
                 continue 2;
               case '$nin':
                 $this->denormalizeValue($v, $attribute, $class);
-                $c[] = Promise\When::resolve("`$attribute` NOT IN (" . implode(", ", $v) . ")");
+                $c[] = Promise\When::resolve("`$attribute` NOT IN ("
+                  . implode(", ", $v) . ")");
                 continue 2;
               case '$lt':
                 $op = '<';
@@ -408,7 +410,8 @@ class MySQL implements Database\Interfaces\Driver {
                 continue 2;
               case '$not':
                 $not = array($attribute => $v);
-                $c[] = $this->denormalizeSearch($class, array($not))->then(function($c) {
+                $c[] = $this->denormalizeSearch($class, array($not))->then(function (
+                  $c) {
                   return "NOT {$c}";
                 });
                 continue 2;
@@ -459,7 +462,7 @@ class MySQL implements Database\Interfaces\Driver {
               $c[] = Promise\When::resolve("`$attribute` $op $v");
               $op = '=';
             }
-            $w[] = Promise\When::all($c, function($c) {
+            $w[] = Promise\When::all($c, function ($c) {
               return "(" . implode(" AND ", $c) . ")";
             });
             continue;
@@ -469,7 +472,7 @@ class MySQL implements Database\Interfaces\Driver {
           $w[] = Promise\When::resolve("`$attribute` $op $condition");
           $op = '=';
         }
-        return Promise\When::all($w, function($w) {
+        return Promise\When::all($w, function ($w) {
           return implode(" AND ", $w);
         });
       });

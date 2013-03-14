@@ -15,6 +15,7 @@
 
 namespace Bread\Routing;
 
+use Bread\Dough\ClassLoader;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Client\Exceptions;
 use Bread\Promise;
@@ -28,27 +29,17 @@ class Router {
     foreach ($routes as $route) {
       $route = new Route\Model($route);
       if (preg_match($route->pattern, $request->uri, $matches)) {
-        if (isset($matches['controller'])) {
-          $ns = explode('/', $matches['controller']);
-          $ns = array_map('Bread\L10n\Inflector::camelize', $ns);
-          $matches['controller'] = implode(NS, $ns);
+        $matches = array_merge(array('controller' => null, 'action' => null), $route->defaults, $matches);
+        if (!ClassLoader::classExists($matches['controller'])) {
+          throw new Exceptions\NotFound($request->uri);
         }
-        $matches = array_merge(array(
-          'controller' => null, 'action' => null
-        ), $route->defaults, $matches);
-        if (isset($matches['namespace'])) {
-          $matches['controller'] = $matches['namespace'] . NS . $matches['controller'] . NS . 'Controller';
+        $callback = array($matches['controller'], $matches['action']);
+        if (!is_callable($callback)) {
+          throw new Exceptions\NotFound($request->uri);
         }
-        if (!is_subclass_of($matches['controller'], 'Bread\Controller')) {
-          return Promise\When::reject(new Exceptions\NotFound(
-            $matches['controller']));
-        }
-        $arguments = array_intersect_key($matches, array_flip((array) $route->arguments));
-        return Promise\When::resolve(array(
-          $matches['controller'], $matches['action'], $arguments
-        ));
+        return $callback;
       }
     }
-    return Promise\When::reject(new Exceptions\NotFound($request->uri));
+    throw new Exceptions\NotFound($request->uri);
   }
 }

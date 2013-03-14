@@ -36,10 +36,42 @@ abstract class Controller {
    * @var Response $response
    */
   protected $response;
+  
+  protected $data;
 
   public function __construct(Request $request, Response $response) {
     $this->request = $request;
     $this->response = $response;
+
+    switch ($this->request->method) {
+    case 'OPTIONS':
+      break;
+    case 'HEAD':
+      $this->response->on('headers', array($this->request, 'end'));
+    case 'GET':
+      break;
+    case 'POST':
+    case 'PUT':
+      $this->data = new Promise\Deferred();
+      switch ($this->request->type) {
+      case 'application/x-www-form-urlencoded':
+        $buffer = fopen('php://temp', 'r+');
+        $this->request->on('data', function ($data) use ($buffer) {
+          fwrite($buffer, $data);
+          $this->data->progress($data);
+        })->on('end', function () use ($buffer) {
+          rewind($buffer);
+          $data = stream_get_contents($buffer);
+          parse_str($data, $form);
+          $this->data->resolve($form);
+        });
+      }
+      break;
+    case 'DELETE':
+    case 'TRACE':
+    case 'CONNECT':
+    default:
+    }
   }
 
   public static function get($key = null) {

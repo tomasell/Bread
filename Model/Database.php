@@ -56,6 +56,7 @@ CM::defaults('Bread\Model\Database', array(
   'drivers' => array(
     'mongodb' => 'Bread\Model\Database\Drivers\MongoDB',
     'mysql' => 'Bread\Model\Database\Drivers\MySQL',
-    'ldap' => 'Bread\Model\Database\Drivers\LDAP'
+    'ldap' => 'Bread\Model\Database\Drivers\LDAP',
+    'odbc' => 'Bread\Model\Database\Drivers\ODBC'
   )
 ));

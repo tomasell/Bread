@@ -51,6 +51,7 @@ abstract class View {
         $page('[data-bread-messages]')->append("div.$class", $message);
       }
     }
+    return $page;
   }
 
 }

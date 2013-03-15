@@ -25,16 +25,9 @@ use Exception;
 class Dispatcher {
   public function dispatch(Request $request, Response $response) {
     $router = new Router();
-    $router->route($request)->then(function ($result) use ($request, $response) {
-      list($Controller, $action, $arguments) = $result;
-      $controller = new $Controller($request, $response);
-      $callback = array(
-        $controller, $action
-      );
-      if (!is_callable($callback)) {
-        return Promise\When::reject(new Exceptions\NotFound($request->uri));
-      }
-      return Promise\When::resolve(call_user_func_array($callback, $arguments));
+    $router->route($request, $response)->then(function ($result) use ($request, $response) {
+      list($callback, $arguments) = $result;
+      return call_user_func_array($callback, $arguments);
     })->then(function ($output) use ($response) {
       $response->end($output);
     }, function (Exception $exception) use ($response) {

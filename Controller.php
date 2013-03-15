@@ -36,7 +36,7 @@ abstract class Controller {
    * @var Response $response
    */
   protected $response;
-  
+
   protected $data;
 
   public function __construct(Request $request, Response $response) {

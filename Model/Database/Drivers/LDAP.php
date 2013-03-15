@@ -140,7 +140,6 @@ class LDAP implements Database\Interfaces\Driver {
       $filter) use ($options) {
       return $this->options(ldap_search($this->link, $this->base, "({$filter})"), $options);
     });
-
   }
 
   protected function options($search, $options = array()) {

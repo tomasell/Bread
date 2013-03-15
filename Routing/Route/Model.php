@@ -18,7 +18,9 @@ namespace Bread\Routing\Route;
 use Bread;
 
 class Model extends Bread\Model {
-  protected $pattern;
-  protected $defaults;
-  protected $arguments;
+  protected $controller;
+  protected $action;
+  protected $arguments = array();
+  protected $patterns = array();
+  protected $defaults = array();
 }

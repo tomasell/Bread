@@ -41,7 +41,7 @@ class Manager {
       Cache::instance()->store($key, $configurations);
       return $configurations;
     })->then(function ($configurations) {
-      static::$configurations = $configurations;
+      static::$configurations = array_merge($configurations, static::$configurations);
     });
   }
 

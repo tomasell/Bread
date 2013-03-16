@@ -26,29 +26,30 @@ use Exception;
 use DateTime;
 use PDO, PDOStatement, PDOException;
 
+CM::defaults('Bread\Model\Database\Drivers\ODBC', array(
+  'db2' => array(
+    'table' => 'QSYS2.SYSCOLUMNS',
+    'schema' => 'table_schema',
+    'name' => 'table_name',
+    'describe' => array(
+      'field' => 'column_name',
+      'type' => 'data_type',
+      'length' => 'length',
+      'null' => 'is_nullable'
+    )
+  )
+));
+
 class ODBC implements Database\Interfaces\Driver {
   const DATETIME_FORMAT = 'YmdHis';
-  protected static $configuration = array(
-    'debug' => array('read' => false),
-    'revisions' => false,
-    'type' => 'db2',
-    'db2' => array(
-      'table' => 'QSYS2.SYSCOLUMNS',
-      'schema' => 'table_schema',
-      'name' => 'table_name',
-      'describe' => array(
-        'field' => 'column_name',
-        'type' => 'data_type',
-        'length' => 'length',
-        'null' => 'is_nullable'
-      )
-    )
-  );
 
+  protected $scheme;
+  protected $schema;
   protected $link;
 
   public function __construct($url) {
     $conn = array_merge(array(
+      'scheme' => null,
       'host' => 'localhost',
       'port' => null,
       'user' => null,
@@ -56,6 +57,8 @@ class ODBC implements Database\Interfaces\Driver {
       'path' => null
     ), parse_url($url));
     try {
+      $this->scheme = $conn['scheme'];
+      $this->schema = ltrim($conn['path'], '/');
       $this->link = new PDO($conn['scheme'] . ':' . $conn['host'], $conn['user'], $conn['pass']);
       $this->link->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
     } catch (PDOException $e) {
@@ -68,12 +71,13 @@ class ODBC implements Database\Interfaces\Driver {
       unset($this->link);
     }
   }
-  public function store($object) {
 
+  public function store($object) {
+    return Promise\When::reject();
   }
 
   public function delete($object) {
-
+    return Promise\When::reject();
   }
 
   public function count($class, $search = array(), $options = array()) {
@@ -89,7 +93,7 @@ class ODBC implements Database\Interfaces\Driver {
     return $this->select($class, $search, $options)->then(function ($select) use (
       $class) {
       $promises = array();
-      $table = array_shift(CM::get($class, 'table'));
+      $table = $this->tableName($class);
       foreach ($select as $result) {
         $promises[] = $this->denormalizeSearch($class, array($result))->then(function (
           $where) use ($class, $table) {
@@ -99,15 +103,6 @@ class ODBC implements Database\Interfaces\Driver {
             $attributes = array();
             $properties = array_merge((array) CM::get($class, "attributes"), $row);
             foreach ($properties as $attribute => $value) {
-              if (CM::get($class, "attributes.$attribute.multiple")) {
-                $multiple = array();
-                $_table = "{$table}_{$attribute}";
-                $projection = $this->projectionFunction($attribute, $this->type($_table, $attribute));
-                foreach ($this->query("SELECT _, {$projection} FROM {$_table} WHERE {$where}") as $r) {
-                  $multiple[$r['_']] = $r[$attribute];
-                }
-                $value = $multiple;
-              }
               $attributes[$attribute] = $value;
             }
             return $this->normalize($attributes, $class)->then(function (
@@ -122,15 +117,10 @@ class ODBC implements Database\Interfaces\Driver {
   }
 
   public function purge($class, $search = array(), $options = array()) {
+    return Promise\When::reject();
   }
 
   protected function projection($table) {
-    //     $projection = array();
-    //     $describe = $this->describe($table);
-    //     foreach ($describe['fields'] as $field => $description) {
-    //       $projection[] = $this->projectionFunction($field, $description['type']);
-    //     }
-    //     return implode(', ', $projection);
     return '*';
   }
 
@@ -138,16 +128,16 @@ class ODBC implements Database\Interfaces\Driver {
     return $this->denormalizeSearch($class, array($search))->then(function (
       $where) use ($class, $options) {
       $options = $this->options($options);
-      $tables = CM::get($class, 'table');
-      $table = array_shift($tables);
+      $table = $this->tableName($class);
       $projection = $this->projection($table);
       $key = implode(', ', (array) CM::get($class, 'keys'));
-      $projection = implode(", $table.", CM::get($class, 'keys'));
+      $projection = implode(", {$table}.", CM::get($class, 'keys'));
       $query = "SELECT {$table}.{$projection} FROM {$table} "
         . "WHERE {$where} GROUP BY {$table}.{$projection} {$options}";
       return $this->query($query);
     });
   }
+
   protected function denormalizeValue(&$value, $field, $class) {
     if (is_null($value)) {
       $value = 'NULL';
@@ -162,7 +152,16 @@ class ODBC implements Database\Interfaces\Driver {
       $value = json_encode($reference);
     }
     if (is_string($value)) {
-      $this->formatValue($value, $this->type(CM::get($class, 'table'), $field));
+      switch ($this->type(CM::get($class, 'database.table'), $field)) {
+      case 'varchar':
+        $v = "'{$v}'";
+        break;
+      case 'date':
+      case 'time':
+      case 'timestamp':
+        $v = $v->format(static::DATETIME_FORMAT);
+        break;
+      }
     }
     elseif (is_array($value)) {
       foreach ($value as &$v) {
@@ -170,6 +169,7 @@ class ODBC implements Database\Interfaces\Driver {
       }
     }
   }
+
   protected function normalize($document, $class) {
     $promises = array();
     foreach ($document as $field => &$value) {
@@ -333,7 +333,6 @@ class ODBC implements Database\Interfaces\Driver {
   }
 
   protected function options($options = array()) {
-
     $return = array();
     foreach ($options as $option => $value) {
       switch ($option) {
@@ -363,16 +362,12 @@ class ODBC implements Database\Interfaces\Driver {
   }
 
   protected function describe($table) {
-    $keys = array(
-      'primary' => array(),
-      'unique' => array(),
-      'indexes' => array()
-    );
-    $table = explode(".", array_shift($table));
-    $query = "SELECT " . implode(",", self::$configuration['db2']['describe'])
-      . " FROM " . self::$configuration['db2']['table'] . " WHERE "
-      . self::$configuration['db2']['schema'] . " = '{$table[0]}' AND "
-      . self::$configuration['db2']['name'] . " = '{$table[1]}'";
+    $query = "SELECT "
+      . implode(",", CM::get(__CLASS__, "{$this->scheme}.describe")) . " FROM "
+      . CM::get(__CLASS__, "{$this->scheme}.table") . " WHERE "
+      . CM::get(__CLASS__, "{$this->scheme}.schema")
+      . " = '{$this->schema}' AND "
+      . CM::get(__CLASS__, "{$this->scheme}.name") . " = '{$table}'";
     $describe = $this->query($query);
     $fields = array();
     foreach ($describe as $field) {
@@ -392,7 +387,6 @@ class ODBC implements Database\Interfaces\Driver {
   }
 
   protected function keys($object) {
-
     $class = get_class($object);
     $keys = array();
     foreach ((array) CM::get($class, 'keys') as $key) {
@@ -401,87 +395,15 @@ class ODBC implements Database\Interfaces\Driver {
     return $keys;
   }
 
-  protected function createType($class, $column, $options = array()) {
-
-    extract(array_merge(array(
-      'type' => null,
-      'multiple' => false,
-      'step' => 1,
-      'min' => null,
-      'null' => true,
-      'default' => null
-    ), $options));
-    if (is_array($default)) {
-      $default = implode(",", array_map('var_export', $default, array_fill(0, count($default), true)));
+  protected function tableName($class) {
+    $class = is_object($class) ? get_class($class) : $class;
+    if ($tableName = CM::get($class, 'database.table')) {
+      return "{$this->schema}.{$tableName}";
     }
-    elseif ($default) {
-      $default = var_export($this->denormalizeValue($default, $column, $class), true);
-    }
-    $default = is_null($default) ? ($null ? "DEFAULT NULL" : '')
-      : "DEFAULT $default";
-    $null = $null ? "" : "NOT NULL";
-    if (is_array($type)) {
-      $implode = implode(",", array_map('var_export', $type, array_fill(0, count($type), true)));
-      return $multiple ? "$column SET($implode) $null $default,\n\t"
-        : "$column ENUM($implode) $null $default,\n\t";
-    }
-    if ($type === 'number') {
-      $sign = null;
-      if (is_numeric($min)) {
-        $sign = ($min < 0) ? null : 'unsigned';
-      }
-      $type = (preg_match('/^any$|\./', $step)) ? 'float' : 'int';
-    }
-    switch ($type) {
-    case 'int':
-      return "$column INT $sign $null $default,\n\t";
-    case 'float':
-      return "$column FLOAT $sign $null $default,\n\t";
-    case 'text':
-    case 'password':
-      return "$column VARCHAR(128) $null $default,\n\t";
-    case 'textarea':
-      return "$column TEXT,\n\t";
-    case 'date':
-    case 'month':
-    case 'week':
-      return "$column DATE $null $default,\n\t";
-    case 'time':
-      return "$column TIME $null $default,\n\t";
-    case 'datetime':
-    case 'datetime-local':
-      return "$column DATETIME $null $default,\n\t";
-    case 'file':
-      return "$column LONGBLOB $null $default,\n\t";
-    case 'checkbox':
-      return "$column TINYINT(1) $null $default,\n\t";
-    }
-    return "$column VARCHAR(128) $null $default,\n\t";
-  }
-
-  protected function createQuery($class, $attribute, $column = null,
-    $null = null) {
-    $options = array_merge(array(
-      'type' => 'text',
-      'multiple' => false,
-      'step' => 1,
-      'min' => null,
-      'null' => true,
-      'default' => null
-    ), (array) $class::get("attributes.$attribute"));
-    if (is_bool($null)) {
-      $options['null'] = $null;
-    }
-    extract($options);
-    if (is_subclass_of($type, 'Bread\Model')) {
-      $options['type'] = 'text';
-    }
-    $column = $column ? : $attribute;
-    return $this->createType($class, $column, $options);
+    return null;
   }
 
   protected function query() {
-
     $args = func_get_args();
     $query = array_shift($args);
     if (is_array(current($args))) {
@@ -504,22 +426,10 @@ class ODBC implements Database\Interfaces\Driver {
       Cache::instance()->store($query, $cache);
       return $cache;
     })->then(function ($result) use (&$cache) {
+      // TODO Async!
       $cache = $result;
     });
     return $cache;
-  }
-
-  protected function formatValue(&$v, $type) {
-    switch ($type) {
-    case 'varchar':
-      $v = "'{$v}'";
-      break;
-    case 'date':
-    case 'time':
-    case 'timestamp':
-      $v = $v->format(static::DATETIME_FORMAT);
-      break;
-    }
   }
 }
 

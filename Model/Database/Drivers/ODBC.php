@@ -59,7 +59,7 @@ class ODBC implements Database\Interfaces\Driver {
     try {
       $this->scheme = $conn['scheme'];
       $this->schema = ltrim($conn['path'], '/');
-      $this->link = new PDO($conn['scheme'] . ':' . $conn['host'], $conn['user'], $conn['pass']);
+      $this->link = new PDO('odbc:' . $conn['host'], $conn['user'], $conn['pass']);
       $this->link->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
     } catch (PDOException $e) {
       throw new Exception('Cannot connect ODBC driver to ' . $conn['host']);

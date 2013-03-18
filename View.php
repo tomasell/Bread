@@ -16,8 +16,10 @@
 namespace Bread;
 
 use Bread\L10n\Locale;
+use Bread\View\Helpers\HTML;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
+use Bread\Configuration;
 
 abstract class View {
   protected $request;
@@ -26,5 +28,36 @@ abstract class View {
   public function __construct(Request $request, Response $response) {
     $this->request = $request;
     $this->response = $response;
+  }
+
+  public function compose(HTML\Page $page) {
+    foreach ($page('[data-bread-block]') as $block) {
+
+    }
+    foreach ($this->response->messages as $severity => $messages) {
+      foreach ($messages as $message) {
+        switch ($severity) {
+        case LOG_INFO:
+          $class = 'alert.alert-info';
+          break;
+        case LOG_NOTICE:
+          $class = 'alert.alert-success';
+          break;
+        case LOG_WARNING:
+          $class = 'alert';
+          break;
+        case LOG_ERR:
+          $class = 'alert.alert-error';
+          break;
+        }
+        $page('[data-bread-messages]')->append("div.$class", $message);
+      }
+    }
+    return $page;
+  }
+
+  public static function get($key = null) {
+    $class = get_called_class();
+    return Configuration\Manager::get($class, $key);
   }
 }

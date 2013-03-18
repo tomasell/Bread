@@ -327,11 +327,11 @@ abstract class Message extends Event\Emitter implements
 
   public function body($body = null) {
     if (!is_resource($body)) {
-      $this->body = new Stream(fopen("php://temp", 'r+'), $this->connection->loop);
+      $this->body = new Stream\Buffer(fopen("php://temp", 'r+'), $this->connection->loop);
       $this->body->write($body);
     }
     else {
-      $this->body = new Stream($body, $this->connection->loop);
+      $this->body = new Stream\Buffer($body, $this->connection->loop);
     }
   }
 

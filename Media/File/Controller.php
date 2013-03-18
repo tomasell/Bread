@@ -13,14 +13,16 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Routing\Route;
+namespace Bread\Media\File;
 
 use Bread;
 
-class Model extends Bread\Model {
-  protected $controller;
-  protected $action;
-  protected $arguments = array();
-  protected $patterns = array();
-  protected $defaults = array();
+class Controller {
+  public function __construct($request, $response) {
+    ;
+  }
+  
+  public function __call($action, $arguments) {
+    var_dump($action, $arguments);
+  }
 }

@@ -15,32 +15,28 @@
 
 namespace Bread\Routing;
 
+use Bread\Networking\HTTP;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
-use Bread\Networking\HTTP\Exception;
 use Bread\Networking\HTTP\Client\Exceptions;
 use Bread\Promise;
+use Exception;
 
 class Dispatcher {
   public function dispatch(Request $request, Response $response) {
     $router = new Router();
-    $router->route($request)->then(function ($result) use ($request, $response) {
-      list($Controller, $action, $arguments) = $result;
-      if (!is_subclass_of($Controller, 'Bread\Controller')) {
-        return Promise\When::reject(new Exceptions\NotFound($request->uri));
-      }
-      $controller = new $Controller($request, $response);
-      $callback = array(
-        $controller, $action
-      );
-      if (!is_callable($callback)) {
-        return Promise\When::reject(new Exceptions\NotFound($request->uri));
-      }
-      return Promise\When::resolve(call_user_func_array($callback, $arguments));
+    $router->route($request, $response)->then(function ($result) use ($request, $response) {
+      list($callback, $arguments) = $result;
+      return call_user_func_array($callback, $arguments);
     })->then(function ($output) use ($response) {
       $response->end($output);
-    }, function (\Exception $exception) use ($response) {
-      $response->status($exception->getCode());
+    }, function (Exception $exception) use ($response) {
+      if ($exception instanceof HTTP\Exception) {
+        $response->status($exception->getCode());
+      }
+      else {
+        $response->status(500);
+      }
       $response->end($exception->getMessage());
     });
   }

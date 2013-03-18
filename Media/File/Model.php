@@ -13,14 +13,21 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Routing\Route;
+namespace Bread\Media\File;
 
 use Bread;
 
 class Model extends Bread\Model {
-  protected $controller;
-  protected $action;
-  protected $arguments = array();
-  protected $patterns = array();
-  protected $defaults = array();
+  protected $path;
+  protected $type;
+  protected $size;
+  protected $data;
 }
+
+Bread\Configuration\Manager::defaults('Bread\Media\File\Model', array(
+  'keys' => array('path'),
+  'attributes' => array(
+    'size' => array('type' => 'number'),
+    'data' => array('type' => 'file')
+  )
+));

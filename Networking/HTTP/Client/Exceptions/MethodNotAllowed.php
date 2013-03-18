@@ -27,4 +27,8 @@ use Bread\Networking\HTTP\Exception;
 class MethodNotAllowed extends Exception {
   protected $code = 405;
   protected $message = "Method Not Allowed";
+  
+  public function __construct($method) {
+    parent::__construct(sprintf("Method %s not allowed", $method));
+  }
 }

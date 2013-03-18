@@ -25,7 +25,6 @@ use JsonSerializable;
 
 abstract class Model implements IteratorAggregate, JsonSerializable {
   public function __construct($attributes = array()) {
-    static::configure();
     foreach (array_intersect_key($attributes, get_object_vars($this)) as $attribute => $value) {
       $this->__set($attribute, $value);
     }
@@ -82,19 +81,8 @@ abstract class Model implements IteratorAggregate, JsonSerializable {
     return Configuration\Manager::get($class, $key);
   }
 
-  public static function configure() {
-    $class = get_called_class();
-    try {
-      Database::driver($class);
-    }
-    catch (Database\Exceptions\DriverNotRegistered $dnr) {
-      Database::register(static::get('database.url'), $class);
-    }
-  }
-  
   protected static function cached($function, $search = array(),
     $options = array()) {
-    static::configure();
     $class = get_called_class();
     $key = implode('::', array(
       $class,

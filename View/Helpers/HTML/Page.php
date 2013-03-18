@@ -15,6 +15,7 @@
 
 namespace Bread\View\Helpers\HTML;
 
+use Bread;
 use Bread\View\Helpers\DOM;
 use DOMXPath;
 
@@ -40,7 +41,6 @@ class Page extends DOM\Document {
   }
 
   public function __toString() {
-    $this->compose();
     return parent::__toString();
   }
 
@@ -80,36 +80,6 @@ class Page extends DOM\Document {
   }
 
   public function save($node = null, $options = LIBXML_NOXMLDECL) {
-    $this->compose();
     return $this->document->saveHTML($node);
-  }
-
-  public function compose($messages = array()) {
-    if ($this->composed) {
-      return;
-    }
-    foreach ($this('[data-bread-block]') as $block) {
-      $name = $block->attr('data-bread-block');
-    }
-    foreach ($messages as $severity => $_messages) {
-      foreach ($_messages as $message) {
-        switch ($severity) {
-        case LOG_INFO:
-          $class = 'alert.alert-info';
-          break;
-        case LOG_NOTICE:
-          $class = 'alert.alert-success';
-          break;
-        case LOG_WARNING:
-          $class = 'alert';
-          break;
-        case LOG_ERR:
-          $class = 'alert.alert-error';
-          break;
-        }
-        $this('[data-bread-messages]')->append("div.$class", $message);
-      }
-    }
-    $this->composed = true;
   }
 }

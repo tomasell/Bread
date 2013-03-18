@@ -13,14 +13,9 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Routing\Route;
+namespace Bread\View\Helpers\UI\Menu;
 
 use Bread;
 
-class Model extends Bread\Model {
-  protected $controller;
-  protected $action;
-  protected $arguments = array();
-  protected $patterns = array();
-  protected $defaults = array();
+class Controller extends Bread\Controller {
 }

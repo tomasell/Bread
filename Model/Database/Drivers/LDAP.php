@@ -111,16 +111,13 @@ class LDAP implements Database\Interfaces\Driver {
       }
       do {
         if ($entry = ldap_get_attributes($this->link, $result)) {
-          $normalized[] = $this->normalizeEntry($class, $entry);
+          $normalized[] = $this->normalizeEntry($class, $entry)->then(function (
+            $attributes) use ($class) {
+            return new $class($attributes);
+          });
         }
       } while ($result = ldap_next_entry($this->link, $result));
-      return Promise\When::all($normalized, function ($entries) use ($class) {
-        $objects = array();
-        foreach ($entries as $attributes) {
-          $objects[] = new $class($attributes);
-        }
-        return new ArrayObject($objects);
-      });
+      return Promise\When::all($normalized);
     });
   }
 
@@ -141,10 +138,8 @@ class LDAP implements Database\Interfaces\Driver {
   protected function search($class, $search = array(), $options = array()) {
     return $this->denormalizeSearch($class, array($this->filter, $search))->then(function (
       $filter) use ($options) {
-      return $this->options(ldap_search($this->link, $this->base, "(" . $filter
-        . ")"), $options);
+      return $this->options(ldap_search($this->link, $this->base, "({$filter})"), $options);
     });
-
   }
 
   protected function options($search, $options = array()) {
@@ -170,12 +165,15 @@ class LDAP implements Database\Interfaces\Driver {
       unset($value['count']);
       $normalizedValues = array();
       foreach ($value as $v) {
-        if ($this->isDN($v)) {
+        if ($this->isDistinguishedName($v)) {
           if ($result = ldap_search($this->link, $v, self::FILTER_ALL)) {
             $newClass = CM::get($class, "attributes.$attribute.type");
             $newEntry = ldap_first_entry($this->link, $result);
             $newEntry = ldap_get_attributes($this->link, $newEntry);
-            $normalizedValues[] = $this->normalizeEntry($newClass, $newEntry);
+            $normalizedValues[] = $this->normalizeEntry($newClass, $newEntry)->then(function (
+              $attributes) use ($newClass) {
+              return new $newClass($attributes);
+            });
           }
         }
         else {
@@ -193,16 +191,11 @@ class LDAP implements Database\Interfaces\Driver {
       }
       return $normalized;
     });
-    /*$explode = explode(';', $attribute);
-     $attribute = array_shift($explode);
-    foreach ((array) $explode as $tag) {
     // TODO tagged attributes
-    }*/
-  }
-
-  protected function isDN($dn) {
-    // Ho fatto prima a costruirla! Da terminale funziona, verifica qui.
-    return preg_match('/^(\w+=[\s\w]+)(,\w+=[\s\w]+)*$/', $dn);
+    //$explode = explode(';', $attribute);
+    //$attribute = array_shift($explode);
+    //foreach ((array) $explode as $tag) {
+    //}
   }
 
   protected function denormalizeEntry(&$entry) {
@@ -343,6 +336,10 @@ class LDAP implements Database\Interfaces\Driver {
   }
 
   protected function denormalizeValue() {
+  }
+
+  protected function isDistinguishedName($dn) {
+    return (bool) preg_match('/^(\w+=[\s\w]+)(,\w+=[\s\w]+)*$/', $dn);
   }
 
   protected function dn($object) {

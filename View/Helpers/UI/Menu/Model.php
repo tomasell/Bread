@@ -13,14 +13,19 @@
  * @license    http://creativecommons.org/licenses/by/3.0/
  */
 
-namespace Bread\Routing\Route;
+namespace Bread\View\Helpers\UI\Menu;
 
 use Bread;
+use Bread\Configuration\Manager as CM;
 
 class Model extends Bread\Model {
-  protected $controller;
-  protected $action;
-  protected $arguments = array();
-  protected $patterns = array();
-  protected $defaults = array();
+  protected $name;
+  protected $position;
+  protected $title;
+  protected $description;
+  protected $href;
 }
+
+CM::defaults('Bread\View\Helpers\UI\Menu\Model', array(
+  'keys' => array('name', 'position')
+));

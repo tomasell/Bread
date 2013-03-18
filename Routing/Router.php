@@ -27,7 +27,8 @@ class Router {
   public static $routes = array();
 
   public function route(Request $request, Response $response) {
-    return Route\Model::fetch()->then(function ($routes) use ($request, $response) {
+    return Route\Model::fetch()->then(function ($routes) use ($request,
+      $response) {
       $routes = array_merge($routes, array_map(function ($route) {
         return new Route\Model($route);
       }, (array) CM::get(__CLASS__, 'routes')));
@@ -55,7 +56,7 @@ class Router {
 
   protected function match(Route\Model $route, Request $request, &$matches) {
     foreach ($route->patterns as $attribute => $pattern) {
-      if (!preg_match($pattern, $request->$attribute, $_matches)) {
+      if (!preg_match('/'.str_replace('/', '\/', $pattern) . '/', $request->$attribute, $_matches)) {
         return false;
       }
       $matches = array_merge($matches, $_matches);

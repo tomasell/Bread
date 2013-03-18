@@ -19,6 +19,7 @@ use Bread\L10n\Locale;
 use Bread\View\Helpers\HTML;
 use Bread\Networking\HTTP\Request;
 use Bread\Networking\HTTP\Response;
+use Bread\Configuration;
 
 abstract class View {
   protected $request;
@@ -31,6 +32,7 @@ abstract class View {
 
   public function compose(HTML\Page $page) {
     foreach ($page('[data-bread-block]') as $block) {
+
     }
     foreach ($this->response->messages as $severity => $messages) {
       foreach ($messages as $message) {
@@ -54,4 +56,8 @@ abstract class View {
     return $page;
   }
 
+  public static function get($key = null) {
+    $class = get_called_class();
+    return Configuration\Manager::get($class, $key);
+  }
 }
